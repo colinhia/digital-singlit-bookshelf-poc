@@ -30,6 +30,19 @@ export type BookAppearance =
       textColor: string;
     };
 
+export type BookBinding = "hardcover" | "paperback";
+
+export interface BookRenderProfile {
+  serialNumber: number;
+  binding: BookBinding;
+  width: number;
+  height: number;
+  depth: number;
+  lean: number;
+  coverThickness: number;
+  pageInset: number;
+}
+
 export type WallId = "left" | "rear" | "right";
 
 export interface BookSlot {
