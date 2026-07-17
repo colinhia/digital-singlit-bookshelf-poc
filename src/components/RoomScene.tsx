@@ -1,14 +1,14 @@
 "use client";
 
 import { PointerLockControls, Text } from "@react-three/drei";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { PointerLockControls as PointerLockControlsImpl } from "three-stdlib";
-import type { Book, BookSlot, RoomControlsHandle, WallId } from "@/types/library";
-import { bookSlots, roomLayout } from "@/data/room";
-import { getBookAppearanceColor, resolveBookAppearance } from "@/data/bookAppearance";
+import type { Book, RoomControlsHandle, WallId } from "@/types/library";
+import { roomLayout } from "@/data/room";
 import RoomSurfaces from "@/components/RoomSurfaces";
+import BookCollection from "@/components/BookCollection";
 
 const ROOM_HALF = 3.84;
 const SHELF_WIDTH = 6.9;
@@ -17,209 +17,10 @@ const BOOKCASE_FACE = ROOM_HALF - 0.18;
 const CAMERA_HEIGHT = 3.53;
 const SLOTS_PER_TIER = roomLayout.walls[0].slotsPerTier;
 const TIER_COUNT = roomLayout.walls[0].tiers;
-const SLOT_STEP = SHELF_WIDTH / SLOTS_PER_TIER;
 const TIER_Y = Array.from({ length: TIER_COUNT }, (_, index) => 0.48 + index * 0.92);
 const BOOKCASE_HEIGHT = 7.72;
 const BOOKCASE_WIDTH = 7.34;
 const EAVE_HEIGHT = 8.02;
-const TITLE_CHARACTER_LIMIT = 20;
-const TITLE_ATLAS_COLUMNS = 30;
-const TITLE_CELL_WIDTH = 64;
-const TITLE_CELL_HEIGHT = 192;
-
-function slotTransform(slot: BookSlot, book: Book) {
-  const along = -SHELF_WIDTH / 2 + SLOT_STEP / 2 + slot.positionOnTier * SLOT_STEP;
-  const height = 0.68 + ((book.serialNumber * 7) % 18) / 100;
-  const y = TIER_Y[slot.tier] + height / 2;
-  const scale: [number, number, number] = [0.245, height, 0.32];
-  if (slot.wall === "rear") return { position: [along, y, -BOOK_FACE] as const, rotation: 0, scale };
-  if (slot.wall === "left") return { position: [-BOOK_FACE, y, -along] as const, rotation: Math.PI / 2, scale };
-  return { position: [BOOK_FACE, y, along] as const, rotation: -Math.PI / 2, scale };
-}
-
-function spineTitle(title: string) {
-  return title.length <= TITLE_CHARACTER_LIMIT
-    ? title
-    : `${title.slice(0, TITLE_CHARACTER_LIMIT - 1).trimEnd()}…`;
-}
-
-function spineLabelColors(book: Book) {
-  const bookColor = getBookAppearanceColor(resolveBookAppearance(book));
-  if (bookColor === "#a95147") return { background: "#cb746a", text: "#321b18" };
-  if (bookColor === "#eaad77") return { background: "#d28f5b", text: "#38231b" };
-  return { background: "#dfd9d1", text: "#33251f" };
-}
-
-function BookTitles({ books, visibleSerials }: { books: Book[]; visibleSerials: Set<number> }) {
-  const booksByInstance = useMemo(() => books.slice(0, 600), [books]);
-  const texture = useMemo(() => {
-    const rows = Math.ceil(booksByInstance.length / TITLE_ATLAS_COLUMNS);
-    const canvas = document.createElement("canvas");
-    canvas.width = TITLE_ATLAS_COLUMNS * TITLE_CELL_WIDTH;
-    canvas.height = Math.max(1, rows * TITLE_CELL_HEIGHT);
-    const context = canvas.getContext("2d");
-    if (context) {
-      context.font = "600 28px Georgia, serif";
-      context.textAlign = "center";
-      context.textBaseline = "middle";
-      context.lineJoin = "round";
-      booksByInstance.forEach((book, index) => {
-        const column = index % TITLE_ATLAS_COLUMNS;
-        const row = Math.floor(index / TITLE_ATLAS_COLUMNS);
-        const centerX = column * TITLE_CELL_WIDTH + TITLE_CELL_WIDTH / 2;
-        const centerY = row * TITLE_CELL_HEIGHT + TITLE_CELL_HEIGHT / 2;
-        context.save();
-        context.translate(centerX, centerY);
-        context.rotate(-Math.PI / 2);
-        const title = spineTitle(book.title);
-        const colors = spineLabelColors(book);
-        const maximumTextWidth = TITLE_CELL_HEIGHT - 32;
-        const renderedTextWidth = Math.min(context.measureText(title).width, maximumTextWidth);
-        const labelWidth = renderedTextWidth + 16;
-        const labelHeight = 42;
-        context.fillStyle = colors.background;
-        context.beginPath();
-        context.roundRect(-labelWidth / 2, -labelHeight / 2, labelWidth, labelHeight, labelHeight / 2);
-        context.fill();
-        context.fillStyle = colors.text;
-        context.fillText(title, 0, 0, maximumTextWidth);
-        context.restore();
-      });
-    }
-    const atlas = new THREE.CanvasTexture(canvas);
-    atlas.colorSpace = THREE.SRGBColorSpace;
-    atlas.minFilter = THREE.LinearFilter;
-    atlas.magFilter = THREE.LinearFilter;
-    atlas.generateMipmaps = false;
-    atlas.needsUpdate = true;
-    return atlas;
-  }, [booksByInstance]);
-
-  const geometry = useMemo(() => {
-    const positions: number[] = [];
-    const uvs: number[] = [];
-    const indices: number[] = [];
-    const rows = Math.max(1, Math.ceil(booksByInstance.length / TITLE_ATLAS_COLUMNS));
-    const matrix = new THREE.Matrix4();
-    const quaternion = new THREE.Quaternion();
-    const position = new THREE.Vector3();
-    const scale = new THREE.Vector3();
-    const vertex = new THREE.Vector3();
-
-    booksByInstance.forEach((book, index) => {
-      if (!visibleSerials.has(book.serialNumber)) return;
-      const transform = slotTransform(bookSlots[index], book);
-      position.set(...transform.position);
-      quaternion.setFromEuler(new THREE.Euler(0, transform.rotation, 0));
-      scale.set(...transform.scale);
-      matrix.compose(position, quaternion, scale);
-
-      const firstVertex = positions.length / 3;
-      const corners: [number, number, number][] = [
-        [-0.38, -0.41, 0.506], [0.38, -0.41, 0.506],
-        [0.38, 0.41, 0.506], [-0.38, 0.41, 0.506],
-      ];
-      corners.forEach((corner) => {
-        vertex.set(...corner).applyMatrix4(matrix);
-        positions.push(vertex.x, vertex.y, vertex.z);
-      });
-
-      const column = index % TITLE_ATLAS_COLUMNS;
-      const row = Math.floor(index / TITLE_ATLAS_COLUMNS);
-      const u0 = column / TITLE_ATLAS_COLUMNS;
-      const u1 = (column + 1) / TITLE_ATLAS_COLUMNS;
-      const vTop = 1 - row / rows;
-      const vBottom = 1 - (row + 1) / rows;
-      uvs.push(u0, vBottom, u1, vBottom, u1, vTop, u0, vTop);
-      indices.push(firstVertex, firstVertex + 1, firstVertex + 2, firstVertex, firstVertex + 2, firstVertex + 3);
-    });
-
-    const result = new THREE.BufferGeometry();
-    result.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    result.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-    result.setIndex(indices);
-    result.computeBoundingSphere();
-    return result;
-  }, [booksByInstance, visibleSerials]);
-
-  useEffect(() => () => texture.dispose(), [texture]);
-  useEffect(() => () => geometry.dispose(), [geometry]);
-
-  return <mesh geometry={geometry} renderOrder={2}>
-    <meshBasicMaterial map={texture} transparent alphaTest={0.12} depthWrite={false} toneMapped={false} side={THREE.FrontSide} />
-  </mesh>;
-}
-
-function Books({ books, visibleSerials, onSelect, onTarget }: { books: Book[]; visibleSerials: Set<number>; onSelect: (book: Book) => void; onTarget: (book: Book | null) => void }) {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
-  const { camera, gl } = useThree();
-  const raycaster = useMemo(() => new THREE.Raycaster(), []);
-  const targetRef = useRef<Book | null>(null);
-  const targetIndexRef = useRef<number | null>(null);
-  const booksByInstance = useMemo(() => books.slice(0, 600), [books]);
-
-  useEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    const matrix = new THREE.Matrix4();
-    const quaternion = new THREE.Quaternion();
-    const position = new THREE.Vector3();
-    const scale = new THREE.Vector3();
-    const color = new THREE.Color();
-    booksByInstance.forEach((book, index) => {
-      const transform = slotTransform(bookSlots[index], book);
-      position.set(transform.position[0], transform.position[1], transform.position[2]);
-      quaternion.setFromEuler(new THREE.Euler(0, transform.rotation, 0));
-      scale.set(transform.scale[0], transform.scale[1], transform.scale[2]);
-      if (!visibleSerials.has(book.serialNumber)) scale.setScalar(0);
-      matrix.compose(position, quaternion, scale);
-      mesh.setMatrixAt(index, matrix);
-      mesh.setColorAt(index, color.set(getBookAppearanceColor(resolveBookAppearance(book))));
-    });
-    mesh.count = booksByInstance.length;
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    const material = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    material.forEach((item) => { item.needsUpdate = true; });
-    mesh.computeBoundingSphere();
-  }, [booksByInstance, visibleSerials]);
-
-  useFrame(() => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-    const hit = raycaster.intersectObject(mesh, false)[0];
-    const next = hit?.instanceId !== undefined ? booksByInstance[hit.instanceId] : null;
-    const visible = next && visibleSerials.has(next.serialNumber) ? next : null;
-    if (visible?.serialNumber !== targetRef.current?.serialNumber) {
-      if (targetIndexRef.current !== null) {
-        const previous = booksByInstance[targetIndexRef.current];
-        if (previous) mesh.setColorAt(targetIndexRef.current, new THREE.Color(getBookAppearanceColor(resolveBookAppearance(previous))));
-      }
-      targetIndexRef.current = visible && hit?.instanceId !== undefined ? hit.instanceId : null;
-      if (targetIndexRef.current !== null) mesh.setColorAt(targetIndexRef.current, new THREE.Color("#f0c98e"));
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-      targetRef.current = visible;
-      onTarget(visible);
-    }
-  });
-
-  useEffect(() => {
-    const handleClick = () => {
-      if (document.pointerLockElement && targetRef.current) {
-        onSelect(targetRef.current);
-      }
-    };
-    window.addEventListener("click", handleClick);
-    return () => window.removeEventListener("click", handleClick);
-  }, [gl.domElement, onSelect]);
-
-  return <instancedMesh ref={meshRef} args={[undefined, undefined, 600]} castShadow receiveShadow>
-    <boxGeometry />
-    <meshStandardMaterial color="#ffffff" roughness={0.62} metalness={0.03} />
-  </instancedMesh>;
-}
-
 function Bookcase({ wall }: { wall: WallId }) {
   const isRear = wall === "rear";
   const x = wall === "left" ? -BOOKCASE_FACE : wall === "right" ? BOOKCASE_FACE : 0;
@@ -310,8 +111,17 @@ function CameraRig({ mobile, onSelect, target, onControlsReady }: { mobile: bool
 function Scene({ books, visibleSerials, mobile, onSelect, onTarget, target, onControlsReady }: { books: Book[]; visibleSerials: Set<number>; mobile: boolean; onSelect: (book: Book) => void; onTarget: (book: Book | null) => void; target: Book | null; onControlsReady: (controls: RoomControlsHandle | null) => void }) {
   return <>
     <RoomArchitecture />
-    <Books books={books} visibleSerials={visibleSerials} onSelect={onSelect} onTarget={onTarget} />
-    <BookTitles books={books} visibleSerials={visibleSerials} />
+    <BookCollection
+      books={books}
+      visibleSerials={visibleSerials}
+      onSelect={onSelect}
+      onTarget={onTarget}
+      shelfWidth={SHELF_WIDTH}
+      bookFace={BOOK_FACE}
+      tierY={TIER_Y}
+      slotsPerTier={SLOTS_PER_TIER}
+      capacity={roomLayout.totalCapacity}
+    />
     <CameraRig mobile={mobile} onSelect={onSelect} target={target} onControlsReady={onControlsReady} />
   </>;
 }
