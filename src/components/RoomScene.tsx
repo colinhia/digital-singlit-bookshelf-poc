@@ -70,7 +70,7 @@ function RoomArchitecture() {
   </>;
 }
 
-function CameraRig({ mobile, onSelect, target, onControlsReady }: { mobile: boolean; onSelect: (book: Book) => void; target: Book | null; onControlsReady: (controls: RoomControlsHandle | null) => void }) {
+function CameraRig({ mobile, onSelect, target, onControlsReady, onLock, onUnlock }: { mobile: boolean; onSelect: (book: Book) => void; target: Book | null; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
   const { camera, gl } = useThree();
   const drag = useRef({ active:false, moved:false, x:0, y:0 });
   const controlsRef = useRef<PointerLockControlsImpl | null>(null);
@@ -106,10 +106,10 @@ function CameraRig({ mobile, onSelect, target, onControlsReady }: { mobile: bool
     element.addEventListener("pointerdown", down); element.addEventListener("pointermove", move); element.addEventListener("pointerup", up);
     return () => { element.removeEventListener("pointerdown", down); element.removeEventListener("pointermove", move); element.removeEventListener("pointerup", up); };
   }, [camera, gl.domElement, mobile, onSelect, target]);
-  return mobile ? null : <PointerLockControls ref={controlsRef} makeDefault selector="#no-automatic-pointer-lock" />;
+  return mobile ? null : <PointerLockControls ref={controlsRef} makeDefault selector="#no-automatic-pointer-lock" onLock={onLock} onUnlock={onUnlock} />;
 }
 
-function Scene({ books, matchingSerials, mobile, onSelect, onTarget, target, onControlsReady }: { books: Book[]; matchingSerials: Set<number>; mobile: boolean; onSelect: (book: Book) => void; onTarget: (book: Book | null) => void; target: Book | null; onControlsReady: (controls: RoomControlsHandle | null) => void }) {
+function Scene({ books, matchingSerials, mobile, onSelect, onTarget, target, onControlsReady, onLock, onUnlock }: { books: Book[]; matchingSerials: Set<number>; mobile: boolean; onSelect: (book: Book) => void; onTarget: (book: Book | null) => void; target: Book | null; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
   return <>
     <RoomArchitecture />
     <RoomCentrepiece />
@@ -124,17 +124,17 @@ function Scene({ books, matchingSerials, mobile, onSelect, onTarget, target, onC
       slotsPerTier={SLOTS_PER_TIER}
       capacity={roomLayout.totalCapacity}
     />
-    <CameraRig mobile={mobile} onSelect={onSelect} target={target} onControlsReady={onControlsReady} />
+    <CameraRig mobile={mobile} onSelect={onSelect} target={target} onControlsReady={onControlsReady} onLock={onLock} onUnlock={onUnlock} />
   </>;
 }
 
-export default function RoomScene({ books, matchingSerials, onSelect, onTarget, target, mobile, onControlsReady }: { books: Book[]; matchingSerials: Set<number>; onSelect: (book: Book) => void; onTarget: (book: Book | null) => void; target: Book | null; mobile: boolean; onControlsReady: (controls: RoomControlsHandle | null) => void }) {
+export default function RoomScene({ books, matchingSerials, onSelect, onTarget, target, mobile, onControlsReady, onLock, onUnlock }: { books: Book[]; matchingSerials: Set<number>; onSelect: (book: Book) => void; onTarget: (book: Book | null) => void; target: Book | null; mobile: boolean; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
   const handleCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
     gl.setClearColor("#e8d9c5");
     gl.shadowMap.enabled = !mobile;
     gl.shadowMap.type = THREE.PCFSoftShadowMap;
   }, [mobile]);
   return <Canvas camera={{ position:[0,CAMERA_HEIGHT,0.7], fov:68, near:0.1, far:40 }} dpr={mobile ? [1,1.25] : [1,1.7]} shadows={!mobile} onCreated={handleCreated} gl={{ antialias:true, powerPreference:"high-performance" }}>
-    <Scene books={books} matchingSerials={matchingSerials} mobile={mobile} onSelect={onSelect} onTarget={onTarget} target={target} onControlsReady={onControlsReady} />
+    <Scene books={books} matchingSerials={matchingSerials} mobile={mobile} onSelect={onSelect} onTarget={onTarget} target={target} onControlsReady={onControlsReady} onLock={onLock} onUnlock={onUnlock} />
   </Canvas>;
 }

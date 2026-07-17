@@ -9,8 +9,8 @@ import { getBookAppearanceColor, resolveBookAppearance } from "@/data/bookAppear
 const RoomScene = dynamic(() => import("@/components/RoomScene"), { ssr:false, loading:() => <div className="room-loading">Preparing the room…</div> });
 
 type BookField = keyof Book;
-type RoomMode = "paused" | "moving" | "info";
-type MoveOrigin = Exclude<RoomMode, "moving"> | null;
+type RoomMode = "filters" | "resume" | "moving" | "info";
+type LockOrigin = Exclude<RoomMode, "moving"> | null;
 
 interface ViewTransitionDocument extends Document {
   startViewTransition?: (update: () => void) => void;
@@ -19,37 +19,42 @@ interface ViewTransitionDocument extends Document {
 interface RoomState {
   mode: RoomMode;
   selectedBook: Book | null;
-  pendingMoveFrom: MoveOrigin;
+  pendingLockFrom: LockOrigin;
 }
 
 type RoomAction =
-  | { type: "REQUEST_MOVE" }
+  | { type: "REQUEST_LOCK" }
   | { type: "LOCK_ACQUIRED" }
   | { type: "LOCK_FAILED" }
   | { type: "UNLOCKED" }
+  | { type: "SHOW_RESUME" }
   | { type: "OPEN_INFO"; book: Book };
 
-const initialRoomState: RoomState = { mode: "paused", selectedBook: null, pendingMoveFrom: null };
+const initialRoomState: RoomState = { mode: "filters", selectedBook: null, pendingLockFrom: null };
 
 function roomReducer(state: RoomState, action: RoomAction): RoomState {
   switch (action.type) {
-    case "REQUEST_MOVE":
-      return state.mode === "paused" || state.mode === "info"
-        ? { ...state, pendingMoveFrom: state.mode }
+    case "REQUEST_LOCK":
+      return state.mode !== "moving" && state.pendingLockFrom === null
+        ? { ...state, pendingLockFrom: state.mode }
         : state;
     case "LOCK_ACQUIRED":
-      return state.pendingMoveFrom
-        ? { mode: "moving", selectedBook: null, pendingMoveFrom: null }
+      return state.pendingLockFrom
+        ? { mode: "moving", selectedBook: null, pendingLockFrom: null }
         : state;
     case "LOCK_FAILED":
-      return { ...state, pendingMoveFrom: null };
+      return state.pendingLockFrom ? { ...state, pendingLockFrom: null } : state;
     case "UNLOCKED":
       return state.mode === "moving"
-        ? { mode: "paused", selectedBook: null, pendingMoveFrom: null }
+        ? { mode: "filters", selectedBook: null, pendingLockFrom: null }
+        : state;
+    case "SHOW_RESUME":
+      return state.mode === "filters" || state.mode === "info"
+        ? { mode: "resume", selectedBook: null, pendingLockFrom: null }
         : state;
     case "OPEN_INFO":
       return state.mode === "moving"
-        ? { mode: "info", selectedBook: action.book, pendingMoveFrom: null }
+        ? { mode: "info", selectedBook: action.book, pendingLockFrom: null }
         : state;
   }
 }
@@ -67,6 +72,7 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
   const [mobile, setMobile] = useState(false);
   const [webgl, setWebgl] = useState(true);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const resumeRef = useRef<HTMLButtonElement>(null);
   const roomStateRef = useRef(roomState);
   const controlsRef = useRef<RoomControlsHandle | null>(null);
 
@@ -112,8 +118,8 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
 
   const requestMoving = useCallback(() => {
     const current = roomStateRef.current;
-    if (current.mode !== "paused" && current.mode !== "info") return;
-    dispatch({ type: "REQUEST_MOVE" });
+    if (current.mode === "moving" || current.pendingLockFrom !== null) return;
+    dispatch({ type: "REQUEST_LOCK" });
     if (mobile) {
       dispatch({ type: "LOCK_ACQUIRED" });
       return;
@@ -121,6 +127,10 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
     const controls = controlsRef.current;
     if (!controls) {
       dispatch({ type: "LOCK_FAILED" });
+      return;
+    }
+    if (controls.isLocked()) {
+      dispatch({ type: "LOCK_ACQUIRED" });
       return;
     }
     try {
@@ -147,30 +157,30 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
   }, []);
 
   useEffect(() => {
-    const onPointerLock = () => {
-      if (mobile) return;
-      if (document.pointerLockElement) dispatch({ type: "LOCK_ACQUIRED" });
-      else dispatch({ type: "UNLOCKED" });
-    };
     const onPointerLockError = () => dispatch({ type: "LOCK_FAILED" });
-    document.addEventListener("pointerlockchange", onPointerLock);
     document.addEventListener("pointerlockerror", onPointerLockError);
-    return () => {
-      document.removeEventListener("pointerlockchange", onPointerLock);
-      document.removeEventListener("pointerlockerror", onPointerLockError);
-    };
+    return () => document.removeEventListener("pointerlockerror", onPointerLockError);
+  }, [dispatch]);
+
+  const handleControlsLock = useCallback(() => {
+    if (!mobile) dispatch({ type: "LOCK_ACQUIRED" });
+  }, [dispatch, mobile]);
+
+  const handleControlsUnlock = useCallback(() => {
+    if (!mobile) dispatch({ type: "UNLOCKED" });
   }, [dispatch, mobile]);
 
   useEffect(() => {
     const onEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && roomStateRef.current.mode !== "moving") {
-        event.preventDefault();
-        requestMoving();
-      }
+      if (event.key !== "Escape" || event.repeat) return;
+      const mode = roomStateRef.current.mode;
+      if (mode !== "filters" && mode !== "info") return;
+      event.preventDefault();
+      dispatch({ type: "SHOW_RESUME" });
     };
     document.addEventListener("keydown", onEscape);
     return () => document.removeEventListener("keydown", onEscape);
-  }, [requestMoving]);
+  }, [dispatch]);
 
   useEffect(() => {
     if (roomState.mode !== "info" || !roomState.selectedBook) return;
@@ -179,6 +189,10 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
   }, [mobile, roomState.mode, roomState.selectedBook]);
+
+  useEffect(() => {
+    if (roomState.mode === "resume") resumeRef.current?.focus();
+  }, [roomState.mode]);
 
   const openBook = useCallback((book: Book) => {
     if (roomStateRef.current.mode !== "moving") return;
@@ -190,14 +204,14 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
 
   return <main className="library-room">
     <section className="viewport" aria-label={`${bookshelf.name}, an interactive three-dimensional library`}>
-      {webgl ? <RoomScene books={books} matchingSerials={matchingSerials} onSelect={openBook} onTarget={setTargeted} target={targeted} mobile={mobile} onControlsReady={setControls} /> : <div className="webgl-fallback"><h1>{bookshelf.name}</h1><p>Your browser cannot display the 3D room. Use the accessible collection list below.</p></div>}
+      {webgl ? <RoomScene books={books} matchingSerials={matchingSerials} onSelect={openBook} onTarget={setTargeted} target={targeted} mobile={mobile} onControlsReady={setControls} onLock={handleControlsLock} onUnlock={handleControlsUnlock} /> : <div className="webgl-fallback"><h1>{bookshelf.name}</h1><p>Your browser cannot display the 3D room. Use the accessible collection list below.</p></div>}
 
       <header className="room-header">
         <div className="brand"><span className="brand-mark">SL</span><span>SINGAPORE LITERATURE<br/>DIGITAL LIBRARY</span></div>
-        <button className="menu-toggle" type="button" onClick={pauseRoom} aria-expanded={roomState.mode === "paused"}>PAUSE / FILTERS <kbd>ESC</kbd></button>
+        <button className="menu-toggle" type="button" onClick={pauseRoom} aria-expanded={roomState.mode === "filters"}>PAUSE / FILTERS <kbd>ESC</kbd></button>
       </header>
 
-      <div className={`hud-panel ${roomState.mode === "paused" ? "is-open" : ""}`}>
+      <div className={`hud-panel ${roomState.mode === "filters" ? "is-open" : ""}`}>
         <p className="eyebrow">ROOM 01 · {bookshelf.name}</p>
         <p className="hud-description">{bookshelf.description}</p>
         <div className="search-controls">
@@ -229,9 +243,9 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
         {targeted && <><span>S/N {String(targeted.serialNumber).padStart(3,"0")}</span><strong>{targeted.title}</strong><small>{targeted.author}</small></>}
       </div>
 
-      {webgl && <button className={`enter-room ${roomState.mode === "paused" ? "" : "is-hidden"}`} aria-hidden={roomState.mode !== "paused"} tabIndex={roomState.mode === "paused" ? 0 : -1} onClick={requestMoving}>
-        <span>{mobile ? "Touch and drag to look around" : "Click to enter the room"}</span>
-        <small>{mobile ? "Aim the crosshair, then tap a book" : "Move to look · aim and click a book · Escape to release"}</small>
+      {webgl && <button ref={resumeRef} className={`enter-room ${roomState.mode === "filters" || roomState.mode === "resume" ? "" : "is-hidden"}`} aria-hidden={roomState.mode !== "filters" && roomState.mode !== "resume"} tabIndex={roomState.mode === "filters" || roomState.mode === "resume" ? 0 : -1} onClick={requestMoving}>
+        <span>{roomState.mode === "resume" ? (mobile ? "Tap to resume the room" : "Click to resume the room") : (mobile ? "Touch and drag to look around" : "Click to enter the room")}</span>
+        <small>{roomState.mode === "resume" ? "Enter or Space also resumes" : (mobile ? "Aim the crosshair, then tap a book" : "Move to look · aim and click a book · Escape to release")}</small>
       </button>}
 
       {!filtered.length && <div className="empty-room"><h2>No matching books</h2><p>All volumes remain visible in a muted state.</p><button onClick={() => setQuery("")}>Clear search</button></div>}
