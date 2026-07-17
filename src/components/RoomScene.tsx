@@ -109,13 +109,13 @@ function CameraRig({ mobile, onSelect, target, onControlsReady }: { mobile: bool
   return mobile ? null : <PointerLockControls ref={controlsRef} makeDefault selector="#no-automatic-pointer-lock" />;
 }
 
-function Scene({ books, visibleSerials, mobile, onSelect, onTarget, target, onControlsReady }: { books: Book[]; visibleSerials: Set<number>; mobile: boolean; onSelect: (book: Book) => void; onTarget: (book: Book | null) => void; target: Book | null; onControlsReady: (controls: RoomControlsHandle | null) => void }) {
+function Scene({ books, matchingSerials, mobile, onSelect, onTarget, target, onControlsReady }: { books: Book[]; matchingSerials: Set<number>; mobile: boolean; onSelect: (book: Book) => void; onTarget: (book: Book | null) => void; target: Book | null; onControlsReady: (controls: RoomControlsHandle | null) => void }) {
   return <>
     <RoomArchitecture />
     <RoomCentrepiece />
     <BookCollection
       books={books}
-      visibleSerials={visibleSerials}
+      matchingSerials={matchingSerials}
       onSelect={onSelect}
       onTarget={onTarget}
       shelfWidth={SHELF_WIDTH}
@@ -128,13 +128,13 @@ function Scene({ books, visibleSerials, mobile, onSelect, onTarget, target, onCo
   </>;
 }
 
-export default function RoomScene({ books, visibleSerials, onSelect, onTarget, target, mobile, onControlsReady }: { books: Book[]; visibleSerials: Set<number>; onSelect: (book: Book) => void; onTarget: (book: Book | null) => void; target: Book | null; mobile: boolean; onControlsReady: (controls: RoomControlsHandle | null) => void }) {
+export default function RoomScene({ books, matchingSerials, onSelect, onTarget, target, mobile, onControlsReady }: { books: Book[]; matchingSerials: Set<number>; onSelect: (book: Book) => void; onTarget: (book: Book | null) => void; target: Book | null; mobile: boolean; onControlsReady: (controls: RoomControlsHandle | null) => void }) {
   const handleCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
     gl.setClearColor("#e8d9c5");
     gl.shadowMap.enabled = !mobile;
     gl.shadowMap.type = THREE.PCFSoftShadowMap;
   }, [mobile]);
   return <Canvas camera={{ position:[0,CAMERA_HEIGHT,0.7], fov:68, near:0.1, far:40 }} dpr={mobile ? [1,1.25] : [1,1.7]} shadows={!mobile} onCreated={handleCreated} gl={{ antialias:true, powerPreference:"high-performance" }}>
-    <Scene books={books} visibleSerials={visibleSerials} mobile={mobile} onSelect={onSelect} onTarget={onTarget} target={target} onControlsReady={onControlsReady} />
+    <Scene books={books} matchingSerials={matchingSerials} mobile={mobile} onSelect={onSelect} onTarget={onTarget} target={target} onControlsReady={onControlsReady} />
   </Canvas>;
 }

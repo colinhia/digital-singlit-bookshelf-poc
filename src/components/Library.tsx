@@ -104,7 +104,7 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
       !term || activeField === undefined || String(book[activeField]).toLocaleLowerCase().includes(term)
     );
   }, [activeField, books, query]);
-  const visibleSerials = useMemo(() => new Set(filtered.map((book) => book.serialNumber)), [filtered]);
+  const matchingSerials = useMemo(() => new Set(filtered.map((book) => book.serialNumber)), [filtered]);
 
   const setControls = useCallback((controls: RoomControlsHandle | null) => {
     controlsRef.current = controls;
@@ -190,7 +190,7 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
 
   return <main className="library-room">
     <section className="viewport" aria-label={`${bookshelf.name}, an interactive three-dimensional library`}>
-      {webgl ? <RoomScene books={books} visibleSerials={visibleSerials} onSelect={openBook} onTarget={setTargeted} target={targeted} mobile={mobile} onControlsReady={setControls} /> : <div className="webgl-fallback"><h1>{bookshelf.name}</h1><p>Your browser cannot display the 3D room. Use the accessible collection list below.</p></div>}
+      {webgl ? <RoomScene books={books} matchingSerials={matchingSerials} onSelect={openBook} onTarget={setTargeted} target={targeted} mobile={mobile} onControlsReady={setControls} /> : <div className="webgl-fallback"><h1>{bookshelf.name}</h1><p>Your browser cannot display the 3D room. Use the accessible collection list below.</p></div>}
 
       <header className="room-header">
         <div className="brand"><span className="brand-mark">SL</span><span>SINGAPORE LITERATURE<br/>DIGITAL LIBRARY</span></div>
@@ -221,7 +221,7 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
             </div>
           </label>
         </div>
-        <p className="result-count"><strong>{filtered.length}</strong> {filtered.length === 1 ? "volume" : "volumes"} on view</p>
+        <p className="result-count"><strong>{filtered.length}</strong> matching {filtered.length === 1 ? "volume" : "volumes"}</p>
       </div>
 
       {roomState.mode === "moving" && <div className="crosshair" aria-hidden="true"><span /><span /></div>}
@@ -234,7 +234,7 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
         <small>{mobile ? "Aim the crosshair, then tap a book" : "Move to look · aim and click a book · Escape to release"}</small>
       </button>}
 
-      {!filtered.length && <div className="empty-room"><h2>No books found</h2><p>Empty spaces preserve every book&apos;s place.</p><button onClick={() => setQuery("")}>Clear search</button></div>}
+      {!filtered.length && <div className="empty-room"><h2>No matching books</h2><p>All volumes remain visible in a muted state.</p><button onClick={() => setQuery("")}>Clear search</button></div>}
 
       <footer className="room-footer"><span>ARRANGED BY S/N · ASCENDING</span><span>{books.length} VOLUMES · {languageCount} LANGUAGES · 600 SLOTS</span></footer>
     </section>

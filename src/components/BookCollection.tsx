@@ -13,6 +13,7 @@ const TITLE_ATLAS_COLUMNS = 30;
 const TITLE_CELL_WIDTH = 64;
 const TITLE_CELL_HEIGHT = 192;
 const HIGHLIGHT_COLOR = "#f0c98e";
+const FILTERED_BOOK_OPACITY = 0.25;
 const PAGE_COLORS = ["#eadfce", "#f2e8d8", "#ded1be", "#e7dac7"];
 
 interface BookRenderConfig {
@@ -127,7 +128,7 @@ function spineTypographyColors(book: Book) {
   return { text: "#33251f", accent: "#a95147" };
 }
 
-function BookTitles({ items, visibleSerials, config }: { items: ProfiledBook[]; visibleSerials: Set<number>; config: BookRenderConfig }) {
+function BookTitles({ items, matchingSerials, config }: { items: ProfiledBook[]; matchingSerials: Set<number>; config: BookRenderConfig }) {
   const texture = useMemo(() => {
     const rows = Math.max(1, Math.ceil(items.length / TITLE_ATLAS_COLUMNS));
     const canvas = document.createElement("canvas");
@@ -178,64 +179,78 @@ function BookTitles({ items, visibleSerials, config }: { items: ProfiledBook[]; 
     return atlas;
   }, [items]);
 
-  const geometry = useMemo(() => {
-    const positions: number[] = [];
-    const uvs: number[] = [];
-    const indices: number[] = [];
+  const geometries = useMemo(() => {
     const rows = Math.max(1, Math.ceil(items.length / TITLE_ATLAS_COLUMNS));
-    const vertex = new THREE.Vector3();
-    items.forEach((item, index) => {
-      if (!visibleSerials.has(item.book.serialNumber)) return;
-      const { profile } = item;
-      const transform = baseMatrix(item, config);
-      const firstVertex = positions.length / 3;
-      const halfWidth = profile.width * 0.38;
-      const bottom = 0;
-      const top = profile.height;
-      const front = profile.depth / 2 + 0.006;
-      const corners: [number, number, number][] = [
-        [-halfWidth, bottom, front], [halfWidth, bottom, front],
-        [halfWidth, top, front], [-halfWidth, top, front],
-      ];
-      corners.forEach((corner) => {
-        vertex.set(...corner).applyMatrix4(transform);
-        positions.push(vertex.x, vertex.y, vertex.z);
+    const createGeometry = (matchesFilter: boolean) => {
+      const positions: number[] = [];
+      const uvs: number[] = [];
+      const indices: number[] = [];
+      const vertex = new THREE.Vector3();
+      items.forEach((item, index) => {
+        if (matchingSerials.has(item.book.serialNumber) !== matchesFilter) return;
+        const { profile } = item;
+        const transform = baseMatrix(item, config);
+        const firstVertex = positions.length / 3;
+        const halfWidth = profile.width * 0.38;
+        const bottom = 0;
+        const top = profile.height;
+        const front = profile.depth / 2 + 0.006;
+        const corners: [number, number, number][] = [
+          [-halfWidth, bottom, front], [halfWidth, bottom, front],
+          [halfWidth, top, front], [-halfWidth, top, front],
+        ];
+        corners.forEach((corner) => {
+          vertex.set(...corner).applyMatrix4(transform);
+          positions.push(vertex.x, vertex.y, vertex.z);
+        });
+        const column = index % TITLE_ATLAS_COLUMNS;
+        const row = Math.floor(index / TITLE_ATLAS_COLUMNS);
+        const u0 = column / TITLE_ATLAS_COLUMNS;
+        const u1 = (column + 1) / TITLE_ATLAS_COLUMNS;
+        const vTop = 1 - row / rows;
+        const vBottom = 1 - (row + 1) / rows;
+        uvs.push(u0, vBottom, u1, vBottom, u1, vTop, u0, vTop);
+        indices.push(firstVertex, firstVertex + 1, firstVertex + 2, firstVertex, firstVertex + 2, firstVertex + 3);
       });
-      const column = index % TITLE_ATLAS_COLUMNS;
-      const row = Math.floor(index / TITLE_ATLAS_COLUMNS);
-      const u0 = column / TITLE_ATLAS_COLUMNS;
-      const u1 = (column + 1) / TITLE_ATLAS_COLUMNS;
-      const vTop = 1 - row / rows;
-      const vBottom = 1 - (row + 1) / rows;
-      uvs.push(u0, vBottom, u1, vBottom, u1, vTop, u0, vTop);
-      indices.push(firstVertex, firstVertex + 1, firstVertex + 2, firstVertex, firstVertex + 2, firstVertex + 3);
-    });
-    const result = new THREE.BufferGeometry();
-    result.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    result.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-    result.setIndex(indices);
-    result.computeBoundingSphere();
-    return result;
-  }, [config, items, visibleSerials]);
+      const result = new THREE.BufferGeometry();
+      result.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      result.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+      result.setIndex(indices);
+      result.computeBoundingSphere();
+      return result;
+    };
+    return { matching: createGeometry(true), filtered: createGeometry(false) };
+  }, [config, items, matchingSerials]);
 
   useEffect(() => () => texture.dispose(), [texture]);
-  useEffect(() => () => geometry.dispose(), [geometry]);
+  useEffect(() => () => {
+    geometries.matching.dispose();
+    geometries.filtered.dispose();
+  }, [geometries]);
 
-  return <mesh geometry={geometry} renderOrder={3}>
-    <meshBasicMaterial map={texture} transparent alphaTest={0.12} depthWrite={false} toneMapped={false} side={THREE.FrontSide} />
-  </mesh>;
+  return <>
+    <mesh geometry={geometries.filtered} renderOrder={3}>
+      <meshBasicMaterial map={texture} transparent opacity={FILTERED_BOOK_OPACITY} alphaTest={0.04} depthWrite={false} toneMapped={false} side={THREE.FrontSide} />
+    </mesh>
+    <mesh geometry={geometries.matching} renderOrder={4}>
+      <meshBasicMaterial map={texture} transparent alphaTest={0.12} depthWrite={false} toneMapped={false} side={THREE.FrontSide} />
+    </mesh>
+  </>;
 }
 
-function RealisticBooks({ items, visibleSerials, config, onSelect, onTarget }: {
+function RealisticBooks({ items, matchingSerials, config, onSelect, onTarget }: {
   items: ProfiledBook[];
-  visibleSerials: Set<number>;
+  matchingSerials: Set<number>;
   config: BookRenderConfig;
   onSelect: (book: Book) => void;
   onTarget: (book: Book | null) => void;
 }) {
-  const spineRef = useRef<THREE.InstancedMesh>(null);
-  const pagesRef = useRef<THREE.InstancedMesh>(null);
-  const boardsRef = useRef<THREE.InstancedMesh>(null);
+  const matchingSpineRef = useRef<THREE.InstancedMesh>(null);
+  const matchingPagesRef = useRef<THREE.InstancedMesh>(null);
+  const matchingBoardsRef = useRef<THREE.InstancedMesh>(null);
+  const filteredSpineRef = useRef<THREE.InstancedMesh>(null);
+  const filteredPagesRef = useRef<THREE.InstancedMesh>(null);
+  const filteredBoardsRef = useRef<THREE.InstancedMesh>(null);
   const targetRef = useRef<Book | null>(null);
   const targetIndexRef = useRef<number | null>(null);
   const { camera } = useThree();
@@ -254,21 +269,26 @@ function RealisticBooks({ items, visibleSerials, config, onSelect, onTarget }: {
 
   const setCoverColor = (index: number, value: string) => {
     const color = new THREE.Color(value);
-    spineRef.current?.setColorAt(index, color);
-    boardsRef.current?.setColorAt(index * 2, color);
-    boardsRef.current?.setColorAt(index * 2 + 1, color);
+    matchingSpineRef.current?.setColorAt(index, color);
+    matchingBoardsRef.current?.setColorAt(index * 2, color);
+    matchingBoardsRef.current?.setColorAt(index * 2 + 1, color);
   };
 
   useEffect(() => {
-    const spine = spineRef.current;
-    const pages = pagesRef.current;
-    const boards = boardsRef.current;
-    if (!spine || !pages || !boards) return;
+    const matchingSpine = matchingSpineRef.current;
+    const matchingPages = matchingPagesRef.current;
+    const matchingBoards = matchingBoardsRef.current;
+    const filteredSpine = filteredSpineRef.current;
+    const filteredPages = filteredPagesRef.current;
+    const filteredBoards = filteredBoardsRef.current;
+    if (!matchingSpine || !matchingPages || !matchingBoards || !filteredSpine || !filteredPages || !filteredBoards) return;
+
     const hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
     const pageColor = new THREE.Color();
+    const coverColor = new THREE.Color();
     items.forEach((item, index) => {
       const { profile, book } = item;
-      const visible = visibleSerials.has(book.serialNumber);
+      const matches = matchingSerials.has(book.serialNumber);
       const spineDepth = profile.binding === "hardcover" ? 0.034 : 0.024;
       const pageHeightInset = profile.binding === "hardcover" ? 0.044 : 0.018;
       const pageWidthInset = profile.binding === "hardcover" ? profile.coverThickness * 2.35 : 0.012;
@@ -280,42 +300,68 @@ function RealisticBooks({ items, visibleSerials, config, onSelect, onTarget }: {
       const pageOffset: [number, number, number] = [0, pageHeightInset / 2, -profile.pageInset / 2];
       const spineDimensions: [number, number, number] = [profile.width, profile.height, spineDepth];
       const spineOffset: [number, number, number] = [0, 0, profile.depth / 2 - spineDepth / 2 + 0.001];
-      spine.setMatrixAt(index, visible ? layerMatrix(item, config, spineDimensions, spineOffset) : hiddenMatrix);
-      pages.setMatrixAt(index, visible ? layerMatrix(item, config, pageDimensions, pageOffset) : hiddenMatrix);
-      const coverColor = getBookAppearanceColor(resolveBookAppearance(book));
-      spine.setColorAt(index, new THREE.Color(coverColor));
-      pages.setColorAt(index, pageColor.set(PAGE_COLORS[hashNumber(book.serialNumber, 0x5a17) % PAGE_COLORS.length]));
+      const spineMatrix = layerMatrix(item, config, spineDimensions, spineOffset);
+      const pageMatrix = layerMatrix(item, config, pageDimensions, pageOffset);
+      matchingSpine.setMatrixAt(index, matches ? spineMatrix : hiddenMatrix);
+      filteredSpine.setMatrixAt(index, matches ? hiddenMatrix : spineMatrix);
+      matchingPages.setMatrixAt(index, matches ? pageMatrix : hiddenMatrix);
+      filteredPages.setMatrixAt(index, matches ? hiddenMatrix : pageMatrix);
 
-      const boardHeight = profile.height;
-      const boardDepth = profile.depth;
-      const boardDimensions: [number, number, number] = [profile.coverThickness, boardHeight, boardDepth];
+      coverColor.set(getBookAppearanceColor(resolveBookAppearance(book)));
+      pageColor.set(PAGE_COLORS[hashNumber(book.serialNumber, 0x5a17) % PAGE_COLORS.length]);
+      matchingSpine.setColorAt(index, coverColor);
+      filteredSpine.setColorAt(index, coverColor);
+      matchingPages.setColorAt(index, pageColor);
+      filteredPages.setColorAt(index, pageColor);
+
+      const boardDimensions: [number, number, number] = [profile.coverThickness, profile.height, profile.depth];
       const boardX = profile.width / 2 - profile.coverThickness / 2;
-      const showBoards = visible && profile.binding === "hardcover";
-      boards.setMatrixAt(index * 2, showBoards ? layerMatrix(item, config, boardDimensions, [-boardX, 0, 0]) : hiddenMatrix);
-      boards.setMatrixAt(index * 2 + 1, showBoards ? layerMatrix(item, config, boardDimensions, [boardX, 0, 0]) : hiddenMatrix);
-      boards.setColorAt(index * 2, new THREE.Color(coverColor));
-      boards.setColorAt(index * 2 + 1, new THREE.Color(coverColor));
+      const leftBoardMatrix = layerMatrix(item, config, boardDimensions, [-boardX, 0, 0]);
+      const rightBoardMatrix = layerMatrix(item, config, boardDimensions, [boardX, 0, 0]);
+      const hardcoverMatch = matches && profile.binding === "hardcover";
+      const hardcoverFiltered = !matches && profile.binding === "hardcover";
+      matchingBoards.setMatrixAt(index * 2, hardcoverMatch ? leftBoardMatrix : hiddenMatrix);
+      matchingBoards.setMatrixAt(index * 2 + 1, hardcoverMatch ? rightBoardMatrix : hiddenMatrix);
+      filteredBoards.setMatrixAt(index * 2, hardcoverFiltered ? leftBoardMatrix : hiddenMatrix);
+      filteredBoards.setMatrixAt(index * 2 + 1, hardcoverFiltered ? rightBoardMatrix : hiddenMatrix);
+      [matchingBoards, filteredBoards].forEach((boards) => {
+        boards.setColorAt(index * 2, coverColor);
+        boards.setColorAt(index * 2 + 1, coverColor);
+      });
     });
 
-    spine.count = pages.count = items.length;
-    boards.count = items.length * 2;
-    [spine, pages, boards].forEach((mesh) => {
+    matchingSpine.count = matchingPages.count = filteredSpine.count = filteredPages.count = items.length;
+    matchingBoards.count = filteredBoards.count = items.length * 2;
+    [matchingSpine, matchingPages, matchingBoards, filteredSpine, filteredPages, filteredBoards].forEach((mesh) => {
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-      const material = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      material.forEach((item) => { item.needsUpdate = true; });
       mesh.computeBoundingSphere();
     });
-  }, [config, items, visibleSerials]);
+  }, [config, items, matchingSerials]);
+
+  useEffect(() => {
+    const currentTarget = targetRef.current;
+    if (!currentTarget || matchingSerials.has(currentTarget.serialNumber)) return;
+    if (targetIndexRef.current !== null) {
+      const previous = items[targetIndexRef.current];
+      if (previous) setCoverColor(targetIndexRef.current, getBookAppearanceColor(resolveBookAppearance(previous.book)));
+    }
+    if (matchingSpineRef.current?.instanceColor) matchingSpineRef.current.instanceColor.needsUpdate = true;
+    if (matchingBoardsRef.current?.instanceColor) matchingBoardsRef.current.instanceColor.needsUpdate = true;
+    targetIndexRef.current = null;
+    targetRef.current = null;
+    onTarget(null);
+  }, [items, matchingSerials, onTarget]);
 
   useFrame(() => {
-    const spine = spineRef.current;
-    if (!spine) return;
+    const matchingSpine = matchingSpineRef.current;
+    const filteredSpine = filteredSpineRef.current;
+    if (!matchingSpine || !filteredSpine) return;
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-    const hit = raycaster.intersectObject(spine, false)[0];
+    const hit = raycaster.intersectObjects([matchingSpine, filteredSpine], false)[0];
     const nextIndex = hit?.instanceId ?? null;
     const nextItem = nextIndex !== null ? items[nextIndex] : null;
-    const next = nextItem && visibleSerials.has(nextItem.book.serialNumber) ? nextItem.book : null;
+    const next = nextItem && matchingSerials.has(nextItem.book.serialNumber) ? nextItem.book : null;
     if (next?.serialNumber === targetRef.current?.serialNumber) return;
 
     if (targetIndexRef.current !== null) {
@@ -324,8 +370,8 @@ function RealisticBooks({ items, visibleSerials, config, onSelect, onTarget }: {
     }
     targetIndexRef.current = next ? nextIndex : null;
     if (targetIndexRef.current !== null) setCoverColor(targetIndexRef.current, HIGHLIGHT_COLOR);
-    if (spine.instanceColor) spine.instanceColor.needsUpdate = true;
-    if (boardsRef.current?.instanceColor) boardsRef.current.instanceColor.needsUpdate = true;
+    if (matchingSpine.instanceColor) matchingSpine.instanceColor.needsUpdate = true;
+    if (matchingBoardsRef.current?.instanceColor) matchingBoardsRef.current.instanceColor.needsUpdate = true;
     targetRef.current = next;
     onTarget(next);
   });
@@ -339,21 +385,30 @@ function RealisticBooks({ items, visibleSerials, config, onSelect, onTarget }: {
   }, [onSelect]);
 
   return <>
-    <instancedMesh ref={pagesRef} args={[geometries.pages, undefined, items.length]} receiveShadow>
+    <instancedMesh ref={matchingPagesRef} args={[geometries.pages, undefined, items.length]} receiveShadow>
       <meshStandardMaterial color="#ffffff" roughness={0.92} metalness={0} />
     </instancedMesh>
-    <instancedMesh ref={boardsRef} args={[geometries.boards, undefined, items.length * 2]} castShadow receiveShadow>
+    <instancedMesh ref={matchingBoardsRef} args={[geometries.boards, undefined, items.length * 2]} castShadow receiveShadow>
       <meshStandardMaterial color="#ffffff" roughness={0.74} metalness={0.01} />
     </instancedMesh>
-    <instancedMesh ref={spineRef} args={[geometries.spine, undefined, items.length]} castShadow receiveShadow>
+    <instancedMesh ref={matchingSpineRef} args={[geometries.spine, undefined, items.length]} castShadow receiveShadow>
       <meshStandardMaterial color="#ffffff" roughness={0.64} metalness={0.015} />
+    </instancedMesh>
+    <instancedMesh ref={filteredPagesRef} args={[geometries.pages, undefined, items.length]} receiveShadow renderOrder={0}>
+      <meshStandardMaterial color="#ffffff" roughness={0.92} metalness={0} transparent opacity={FILTERED_BOOK_OPACITY} depthWrite />
+    </instancedMesh>
+    <instancedMesh ref={filteredBoardsRef} args={[geometries.boards, undefined, items.length * 2]} receiveShadow renderOrder={1}>
+      <meshStandardMaterial color="#ffffff" roughness={0.74} metalness={0.01} transparent opacity={FILTERED_BOOK_OPACITY} depthWrite />
+    </instancedMesh>
+    <instancedMesh ref={filteredSpineRef} args={[geometries.spine, undefined, items.length]} receiveShadow renderOrder={2}>
+      <meshStandardMaterial color="#ffffff" roughness={0.64} metalness={0.015} transparent opacity={FILTERED_BOOK_OPACITY} depthWrite />
     </instancedMesh>
   </>;
 }
 
-export default function BookCollection({ books, visibleSerials, onSelect, onTarget, shelfWidth, bookFace, tierY, slotsPerTier, capacity }: {
+export default function BookCollection({ books, matchingSerials, onSelect, onTarget, shelfWidth, bookFace, tierY, slotsPerTier, capacity }: {
   books: Book[];
-  visibleSerials: Set<number>;
+  matchingSerials: Set<number>;
   onSelect: (book: Book) => void;
   onTarget: (book: Book | null) => void;
   shelfWidth: number;
@@ -365,7 +420,7 @@ export default function BookCollection({ books, visibleSerials, onSelect, onTarg
   const config = useMemo<BookRenderConfig>(() => ({ shelfWidth, bookFace, tierY, slotsPerTier, capacity }), [bookFace, capacity, shelfWidth, slotsPerTier, tierY]);
   const items = useMemo(() => getProfiledBooks(books, capacity), [books, capacity]);
   return <>
-    <RealisticBooks items={items} visibleSerials={visibleSerials} config={config} onSelect={onSelect} onTarget={onTarget} />
-    <BookTitles items={items} visibleSerials={visibleSerials} config={config} />
+    <RealisticBooks items={items} matchingSerials={matchingSerials} config={config} onSelect={onSelect} onTarget={onTarget} />
+    <BookTitles items={items} matchingSerials={matchingSerials} config={config} />
   </>;
 }
