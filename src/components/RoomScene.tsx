@@ -8,6 +8,7 @@ import type { PointerLockControls as PointerLockControlsImpl } from "three-stdli
 import type { Book, BookSlot, RoomControlsHandle, WallId } from "@/types/library";
 import { bookSlots, roomLayout } from "@/data/room";
 import { getBookAppearanceColor, resolveBookAppearance } from "@/data/bookAppearance";
+import RoomSurfaces from "@/components/RoomSurfaces";
 
 const ROOM_HALF = 3.84;
 const SHELF_WIDTH = 6.9;
@@ -249,63 +250,13 @@ function Vines() {
   </group>)}</group>;
 }
 
-function RoofFace({ points }: { points: [[number,number,number],[number,number,number],[number,number,number]] }) {
-  const geometry = useMemo(() => {
-    const result = new THREE.BufferGeometry();
-    result.setAttribute("position", new THREE.Float32BufferAttribute(points.flat(), 3));
-    result.setIndex([0, 1, 2]);
-    result.computeVertexNormals();
-    return result;
-  }, [points]);
-  useEffect(() => () => geometry.dispose(), [geometry]);
-  return <mesh geometry={geometry} castShadow receiveShadow><meshStandardMaterial color="#a95147" roughness={0.92} side={THREE.DoubleSide} /></mesh>;
-}
-
-function RoofBeam({ from, to }: { from: [number,number,number]; to: [number,number,number] }) {
-  const transform = useMemo(() => {
-    const start = new THREE.Vector3(...from);
-    const end = new THREE.Vector3(...to);
-    const direction = end.clone().sub(start);
-    return {
-      position: start.clone().add(end).multiplyScalar(0.5),
-      length: direction.length(),
-      quaternion: new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize()),
-    };
-  }, [from, to]);
-  return <mesh position={transform.position} quaternion={transform.quaternion} castShadow>
-    <boxGeometry args={[0.2, transform.length, 0.2]} />
-    <meshStandardMaterial color="#5d371f" roughness={0.82} />
-  </mesh>;
-}
-
-function PyramidRoof() {
-  const { apex, corners, faces } = useMemo(() => {
-    const edge = ROOM_HALF + 0.05;
-    const eave = EAVE_HEIGHT;
-    const roofApex: [number,number,number] = [0, 10.2, 0];
-    const roofCorners: [number,number,number][] = [
-      [-edge,eave,-edge], [edge,eave,-edge], [edge,eave,edge], [-edge,eave,edge],
-    ];
-    const roofFaces: [[number,number,number],[number,number,number],[number,number,number]][] = [
-      [roofCorners[0],roofCorners[1],roofApex], [roofCorners[1],roofCorners[2],roofApex],
-      [roofCorners[2],roofCorners[3],roofApex], [roofCorners[3],roofCorners[0],roofApex],
-    ];
-    return { apex:roofApex, corners:roofCorners, faces:roofFaces };
-  }, []);
-  return <group>
-    {faces.map((points, index) => <RoofFace key={index} points={points} />)}
-    {corners.map((corner, index) => <RoofBeam key={`hip-${index}`} from={corner} to={apex} />)}
-    {corners.map((corner, index) => <RoofBeam key={`edge-${index}`} from={corner} to={corners[(index+1)%4]} />)}
-  </group>;
-}
-
 function RoomArchitecture() {
   return <>
     <color attach="background" args={["#e8d9c5"]} />
     <ambientLight intensity={1.35} color="#ffd7a6" />
     <directionalLight position={[0, 7, 2]} intensity={2.2} color="#ffd3a0" castShadow shadow-mapSize={[1024,1024]} />
     <pointLight position={[0, 4.6, 0]} intensity={35} distance={14} color="#f2a96f" />
-    <mesh rotation={[-Math.PI/2,0,0]} receiveShadow><planeGeometry args={[ROOM_HALF * 2,ROOM_HALF * 2]} /><meshStandardMaterial color="#d98c5f" roughness={0.95} /></mesh>
+    <RoomSurfaces roomHalf={ROOM_HALF} eaveHeight={EAVE_HEIGHT} />
     <mesh position={[0,EAVE_HEIGHT / 2,ROOM_HALF]}><boxGeometry args={[ROOM_HALF * 2,EAVE_HEIGHT,0.18]} /><meshStandardMaterial color="#eee4d4" roughness={1} /></mesh>
     <mesh position={[0,6.9,ROOM_HALF-0.12]}><boxGeometry args={[ROOM_HALF * 2,0.32,0.14]} /><meshStandardMaterial color="#a95147" /></mesh>
     <mesh position={[0,0.45,ROOM_HALF-0.12]}><boxGeometry args={[ROOM_HALF * 2,0.7,0.15]} /><meshStandardMaterial color="#a95147" /></mesh>
@@ -313,7 +264,6 @@ function RoomArchitecture() {
     <mesh position={[0,2.45,ROOM_HALF-0.4]}><boxGeometry args={[1.72,4.22,0.15]} /><meshStandardMaterial color="#b36d46" roughness={0.86} /></mesh>
     <Text position={[0,2.5,ROOM_HALF-0.52]} rotation={[0,Math.PI,0]} fontSize={0.18} color="#f4e7d0" letterSpacing={0.2}>THE DOOR</Text>
     <Bookcase wall="left" /><Bookcase wall="rear" /><Bookcase wall="right" />
-    <PyramidRoof />
     <Vines />
   </>;
 }
