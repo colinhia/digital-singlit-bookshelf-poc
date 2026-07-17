@@ -73,6 +73,7 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
   const dispatch = useCallback((action: RoomAction) => {
     const current = roomStateRef.current;
     const next = roomReducer(current, action);
+    if (Object.is(current, next)) return;
     roomStateRef.current = next;
 
     const commit = () => rawDispatch(action);
@@ -173,16 +174,16 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
 
   useEffect(() => {
     if (roomState.mode !== "info" || !roomState.selectedBook) return;
+    if (!mobile && controlsRef.current?.isLocked()) controlsRef.current.unlock();
     closeRef.current?.focus();
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
-  }, [roomState.mode, roomState.selectedBook]);
+  }, [mobile, roomState.mode, roomState.selectedBook]);
 
   const openBook = useCallback((book: Book) => {
     if (roomStateRef.current.mode !== "moving") return;
     dispatch({ type: "OPEN_INFO", book });
-    if (!mobile) controlsRef.current?.unlock();
-  }, [dispatch, mobile]);
+  }, [dispatch]);
 
   const selectedBook = roomState.selectedBook;
   const selectedAppearance = selectedBook ? resolveBookAppearance(selectedBook) : null;
