@@ -9,6 +9,7 @@ import type { Book, RoomControlsHandle, WallId } from "@/types/library";
 import { roomLayout } from "@/data/room";
 import RoomSurfaces from "@/components/RoomSurfaces";
 import BookCollection from "@/components/BookCollection";
+import RoomCentrepiece from "@/components/RoomCentrepiece";
 
 const ROOM_HALF = 3.84;
 const SHELF_WIDTH = 6.9;
@@ -111,6 +112,7 @@ function CameraRig({ mobile, onSelect, target, onControlsReady }: { mobile: bool
 function Scene({ books, visibleSerials, mobile, onSelect, onTarget, target, onControlsReady }: { books: Book[]; visibleSerials: Set<number>; mobile: boolean; onSelect: (book: Book) => void; onTarget: (book: Book | null) => void; target: Book | null; onControlsReady: (controls: RoomControlsHandle | null) => void }) {
   return <>
     <RoomArchitecture />
+    <RoomCentrepiece />
     <BookCollection
       books={books}
       visibleSerials={visibleSerials}
