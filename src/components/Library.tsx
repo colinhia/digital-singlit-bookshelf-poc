@@ -25,6 +25,7 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
   const activeField = searchFields.includes(selectedField as BookField)
     ? selectedField as BookField
     : undefined;
+  const languageCount = new Set(books.map((book) => book.language)).size;
 
   const filtered = useMemo(() => {
     const term = query.trim().toLocaleLowerCase();
@@ -95,7 +96,7 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
       <div className="floor" />
     </section>
 
-    <footer><span>AN OPEN SHELF FOR SINGAPORE STORIES</span><span>100 VOLUMES · 4 LANGUAGES</span></footer>
+    <footer><span>AN OPEN SHELF FOR SINGAPORE STORIES</span><span>{books.length} VOLUMES · {languageCount} LANGUAGES</span></footer>
 
     {selected && <div className="backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setSelected(null)}>
       <article className="detail" role="dialog" aria-modal="true" aria-labelledby="book-dialog-title">

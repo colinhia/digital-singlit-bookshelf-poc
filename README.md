@@ -16,3 +16,8 @@ npm run dev
 - `src/data/bookshelves.ts` configures the room independently of its books.
 
 Deploy the repository directly to Vercel using the Next.js preset.
+
+## Neon database
+
+The application reads books from Neon at request time using `DATABASE_URL`.
+The connected database contains the anonymised collection in the public `books` table. The expected schema is documented at `database/001_create_books.sql`.

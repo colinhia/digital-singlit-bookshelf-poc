@@ -4,3 +4,6 @@ node_modules/
 *.log
 .DS_Store
 ~$*.xlsx
+.vercel
+.env*
+scripts/.books-import.json
