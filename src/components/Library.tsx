@@ -1,11 +1,58 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { Book, Bookshelf } from "@/types/library";
+import dynamic from "next/dynamic";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import type { Book, Bookshelf, RoomControlsHandle } from "@/types/library";
+import { getBookAppearanceColor, resolveBookAppearance } from "@/data/bookAppearance";
 
-const colors = ["#b94b37", "#294f62", "#d69c32", "#3d664c", "#7f443c", "#40517a", "#b36b31"];
+const RoomScene = dynamic(() => import("@/components/RoomScene"), { ssr:false, loading:() => <div className="room-loading">Preparing the room…</div> });
 
 type BookField = keyof Book;
+type RoomMode = "paused" | "moving" | "info";
+type MoveOrigin = Exclude<RoomMode, "moving"> | null;
+
+interface ViewTransitionDocument extends Document {
+  startViewTransition?: (update: () => void) => void;
+}
+
+interface RoomState {
+  mode: RoomMode;
+  selectedBook: Book | null;
+  pendingMoveFrom: MoveOrigin;
+}
+
+type RoomAction =
+  | { type: "REQUEST_MOVE" }
+  | { type: "LOCK_ACQUIRED" }
+  | { type: "LOCK_FAILED" }
+  | { type: "UNLOCKED" }
+  | { type: "OPEN_INFO"; book: Book };
+
+const initialRoomState: RoomState = { mode: "paused", selectedBook: null, pendingMoveFrom: null };
+
+function roomReducer(state: RoomState, action: RoomAction): RoomState {
+  switch (action.type) {
+    case "REQUEST_MOVE":
+      return state.mode === "paused" || state.mode === "info"
+        ? { ...state, pendingMoveFrom: state.mode }
+        : state;
+    case "LOCK_ACQUIRED":
+      return state.pendingMoveFrom
+        ? { mode: "moving", selectedBook: null, pendingMoveFrom: null }
+        : state;
+    case "LOCK_FAILED":
+      return { ...state, pendingMoveFrom: null };
+    case "UNLOCKED":
+      return state.mode === "moving"
+        ? { mode: "paused", selectedBook: null, pendingMoveFrom: null }
+        : state;
+    case "OPEN_INFO":
+      return state.mode === "moving"
+        ? { mode: "info", selectedBook: action.book, pendingMoveFrom: null }
+        : state;
+  }
+}
 
 const fieldLabel = (field: string) =>
   field
@@ -15,8 +62,31 @@ const fieldLabel = (field: string) =>
 export default function Library({ books, bookshelf }: { books: Book[]; bookshelf: Bookshelf }) {
   const [query, setQuery] = useState("");
   const [selectedField, setSelectedField] = useState<BookField | "">("");
-  const [selected, setSelected] = useState<Book | null>(null);
+  const [targeted, setTargeted] = useState<Book | null>(null);
+  const [roomState, rawDispatch] = useReducer(roomReducer, initialRoomState);
+  const [mobile, setMobile] = useState(false);
+  const [webgl, setWebgl] = useState(true);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const roomStateRef = useRef(roomState);
+  const controlsRef = useRef<RoomControlsHandle | null>(null);
+
+  const dispatch = useCallback((action: RoomAction) => {
+    const current = roomStateRef.current;
+    const next = roomReducer(current, action);
+    roomStateRef.current = next;
+
+    const commit = () => rawDispatch(action);
+    const transitionDocument = document as ViewTransitionDocument;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (current.mode !== next.mode && transitionDocument.startViewTransition && !reduceMotion) {
+      transitionDocument.startViewTransition(() => flushSync(commit));
+    } else {
+      commit();
+    }
+  }, []);
+
+  useEffect(() => { roomStateRef.current = roomState; }, [roomState]);
 
   const searchFields = useMemo(
     () => (books[0] ? (Object.keys(books[0]) as BookField[]) : []),
@@ -33,27 +103,102 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
       !term || activeField === undefined || String(book[activeField]).toLocaleLowerCase().includes(term)
     );
   }, [activeField, books, query]);
+  const visibleSerials = useMemo(() => new Set(filtered.map((book) => book.serialNumber)), [filtered]);
+
+  const setControls = useCallback((controls: RoomControlsHandle | null) => {
+    controlsRef.current = controls;
+  }, []);
+
+  const requestMoving = useCallback(() => {
+    const current = roomStateRef.current;
+    if (current.mode !== "paused" && current.mode !== "info") return;
+    dispatch({ type: "REQUEST_MOVE" });
+    if (mobile) {
+      dispatch({ type: "LOCK_ACQUIRED" });
+      return;
+    }
+    const controls = controlsRef.current;
+    if (!controls) {
+      dispatch({ type: "LOCK_FAILED" });
+      return;
+    }
+    try {
+      controls.lock();
+    } catch {
+      dispatch({ type: "LOCK_FAILED" });
+    }
+  }, [dispatch, mobile]);
+
+  const pauseRoom = useCallback(() => {
+    if (roomStateRef.current.mode !== "moving") return;
+    if (mobile) dispatch({ type: "UNLOCKED" });
+    else controlsRef.current?.unlock();
+  }, [dispatch, mobile]);
 
   useEffect(() => {
-    if (!selected) return;
+    const media = window.matchMedia("(pointer: coarse)");
+    const update = () => setMobile(media.matches);
+    update();
+    media.addEventListener("change", update);
+    const canvas = document.createElement("canvas");
+    setWebgl(Boolean(canvas.getContext("webgl2") || canvas.getContext("webgl")));
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    const onPointerLock = () => {
+      if (mobile) return;
+      if (document.pointerLockElement) dispatch({ type: "LOCK_ACQUIRED" });
+      else dispatch({ type: "UNLOCKED" });
+    };
+    const onPointerLockError = () => dispatch({ type: "LOCK_FAILED" });
+    document.addEventListener("pointerlockchange", onPointerLock);
+    document.addEventListener("pointerlockerror", onPointerLockError);
+    return () => {
+      document.removeEventListener("pointerlockchange", onPointerLock);
+      document.removeEventListener("pointerlockerror", onPointerLockError);
+    };
+  }, [dispatch, mobile]);
+
+  useEffect(() => {
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && roomStateRef.current.mode !== "moving") {
+        event.preventDefault();
+        requestMoving();
+      }
+    };
+    document.addEventListener("keydown", onEscape);
+    return () => document.removeEventListener("keydown", onEscape);
+  }, [requestMoving]);
+
+  useEffect(() => {
+    if (roomState.mode !== "info" || !roomState.selectedBook) return;
     closeRef.current?.focus();
-    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setSelected(null);
-    document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
-    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = ""; };
-  }, [selected]);
+    return () => { document.body.style.overflow = ""; };
+  }, [roomState.mode, roomState.selectedBook]);
 
-  return <main>
-    <header className="masthead">
-      <div className="brand"><span className="brand-mark">SL</span><span>SINGAPORE LITERATURE<br/>DIGITAL LIBRARY</span></div>
-      <span className="room-number">ROOM 01</span>
-    </header>
+  const openBook = useCallback((book: Book) => {
+    if (roomStateRef.current.mode !== "moving") return;
+    dispatch({ type: "OPEN_INFO", book });
+    if (!mobile) controlsRef.current?.unlock();
+  }, [dispatch, mobile]);
 
-    <section className="intro">
-      <p className="eyebrow">YOU&apos;VE FOUND A QUIET CORNER</p>
-      <h1>{bookshelf.name}</h1>
-      <p className="lede">{bookshelf.description} Pull a volume from the shelf and linger awhile.</p>
-      <div className="search-row">
+  const selectedBook = roomState.selectedBook;
+  const selectedAppearance = selectedBook ? resolveBookAppearance(selectedBook) : null;
+
+  return <main className="library-room">
+    <section className="viewport" aria-label={`${bookshelf.name}, an interactive three-dimensional library`}>
+      {webgl ? <RoomScene books={books} visibleSerials={visibleSerials} onSelect={openBook} onTarget={setTargeted} target={targeted} mobile={mobile} onControlsReady={setControls} /> : <div className="webgl-fallback"><h1>{bookshelf.name}</h1><p>Your browser cannot display the 3D room. Use the accessible collection list below.</p></div>}
+
+      <header className="room-header">
+        <div className="brand"><span className="brand-mark">SL</span><span>SINGAPORE LITERATURE<br/>DIGITAL LIBRARY</span></div>
+        <button className="menu-toggle" type="button" onClick={pauseRoom} aria-expanded={roomState.mode === "paused"}>PAUSE / FILTERS <kbd>ESC</kbd></button>
+      </header>
+
+      <div className={`hud-panel ${roomState.mode === "paused" ? "is-open" : ""}`}>
+        <p className="eyebrow">ROOM 01 · {bookshelf.name}</p>
+        <p className="hud-description">{bookshelf.description}</p>
         <div className="search-controls">
           <label className="field-control">
             <span>Type:</span>
@@ -75,45 +220,48 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
             </div>
           </label>
         </div>
-        <p><strong>{filtered.length}</strong> {filtered.length === 1 ? "volume" : "volumes"} on view</p>
+        <p className="result-count"><strong>{filtered.length}</strong> {filtered.length === 1 ? "volume" : "volumes"} on view</p>
       </div>
+
+      {roomState.mode === "moving" && <div className="crosshair" aria-hidden="true"><span /><span /></div>}
+      <div className={`target-card ${roomState.mode === "moving" && targeted ? "is-visible" : ""}`} aria-live="polite">
+        {targeted && <><span>S/N {String(targeted.serialNumber).padStart(3,"0")}</span><strong>{targeted.title}</strong><small>{targeted.author}</small></>}
+      </div>
+
+      {webgl && <button className={`enter-room ${roomState.mode === "paused" ? "" : "is-hidden"}`} aria-hidden={roomState.mode !== "paused"} tabIndex={roomState.mode === "paused" ? 0 : -1} onClick={requestMoving}>
+        <span>{mobile ? "Touch and drag to look around" : "Click to enter the room"}</span>
+        <small>{mobile ? "Aim the crosshair, then tap a book" : "Move to look · aim and click a book · Escape to release"}</small>
+      </button>}
+
+      {!filtered.length && <div className="empty-room"><h2>No books found</h2><p>Empty spaces preserve every book&apos;s place.</p><button onClick={() => setQuery("")}>Clear search</button></div>}
+
+      <footer className="room-footer"><span>ARRANGED BY S/N · ASCENDING</span><span>{books.length} VOLUMES · {languageCount} LANGUAGES · 600 SLOTS</span></footer>
     </section>
 
-    <section className="alcove" aria-live="polite">
-      <div className="alcove-top"><span>THE COLLECTION</span><span>ARRANGED BY S/N · ASCENDING</span></div>
-      {filtered.length ? <div className="shelf-list">
-        {Array.from({ length: Math.ceil(filtered.length / 20) }, (_, shelfIndex) => <div className="shelf" key={shelfIndex}>
-          <div className="books">
-            {filtered.slice(shelfIndex * 20, shelfIndex * 20 + 20).map((book) => <button
-              className="book" key={book.serialNumber} onClick={() => setSelected(book)}
-              style={{ "--book-color": colors[(book.serialNumber - 1) % colors.length], "--book-height": `${76 + (book.serialNumber * 7) % 22}%` } as React.CSSProperties}
-              aria-label={`Open ${book.title} by ${book.author}`}
-            ><span className="book-number">{String(book.serialNumber).padStart(3,"0")}</span><span className="book-title">{book.title}</span></button>)}
-          </div>
-          <div className="wood-edge" />
-        </div>)}
-      </div> : <div className="empty"><span>∅</span><h2>No books found</h2><p>Try a different query for {activeField ? fieldLabel(activeField).toLocaleLowerCase() : "this field"}.</p><button onClick={() => setQuery("")}>Clear search</button></div>}
-      <div className="floor" />
-    </section>
+    <div className="sr-collection" aria-label="Accessible book collection">
+      {filtered.map((book) => <button key={book.serialNumber} onClick={() => openBook(book)}>Open {book.title} by {book.author}</button>)}
+    </div>
 
-    <footer><span>AN OPEN SHELF FOR SINGAPORE STORIES</span><span>{books.length} VOLUMES · {languageCount} LANGUAGES</span></footer>
-
-    {selected && <div className="backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setSelected(null)}>
+    {roomState.mode === "info" && selectedBook && selectedAppearance && <div className="backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && requestMoving()}>
       <article className="detail" role="dialog" aria-modal="true" aria-labelledby="book-dialog-title">
-        <button ref={closeRef} className="close" onClick={() => setSelected(null)} aria-label="Close book details">×</button>
-        <div className="detail-cover" style={{ "--book-color": colors[(selected.serialNumber - 1) % colors.length] } as React.CSSProperties}>
-          <span>SINGLIT<br/>COLLECTION</span><strong>{selected.title}</strong><small>{selected.author}</small><b>{String(selected.serialNumber).padStart(3,"0")}</b>
+        <button ref={closeRef} className="close" onClick={requestMoving} aria-label="Close book details">×</button>
+        <div className="detail-cover" style={{
+          "--book-color": getBookAppearanceColor(selectedAppearance),
+          "--book-text-color": selectedAppearance.textColor,
+          ...(selectedAppearance.kind === "image" ? { "--book-image": `url(${selectedAppearance.assetPath})` } : {}),
+        } as React.CSSProperties}>
+          <span>SINGLIT<br/>COLLECTION</span><strong>{selectedBook.title}</strong><small>{selectedBook.author}</small><b>{String(selectedBook.serialNumber).padStart(3,"0")}</b>
         </div>
         <div className="detail-copy">
-          <p className="eyebrow">VOLUME {String(selected.serialNumber).padStart(3,"0")}</p>
-          <h2 id="book-dialog-title">{selected.title}</h2>
-          <p className="author">by {selected.author}</p>
+          <p className="eyebrow">VOLUME {String(selectedBook.serialNumber).padStart(3,"0")}</p>
+          <h2 id="book-dialog-title">{selectedBook.title}</h2>
+          <p className="author">by {selectedBook.author}</p>
           <dl>
-            <div><dt>Language</dt><dd>{selected.language}</dd></div>
-            <div><dt>Location</dt><dd>{selected.locationCode}</dd></div>
-            <div><dt>Call number</dt><dd>{selected.callNumber}</dd></div>
-            <div><dt>Barcode</dt><dd>{selected.barcode}</dd></div>
-            <div><dt>Serial number</dt><dd>{selected.serialNumber}</dd></div>
+            <div><dt>Language</dt><dd>{selectedBook.language}</dd></div>
+            <div><dt>Location</dt><dd>{selectedBook.locationCode}</dd></div>
+            <div><dt>Call number</dt><dd>{selectedBook.callNumber}</dd></div>
+            <div><dt>Barcode</dt><dd>{selectedBook.barcode}</dd></div>
+            <div><dt>Serial number</dt><dd>{selectedBook.serialNumber}</dd></div>
           </dl>
         </div>
       </article>
