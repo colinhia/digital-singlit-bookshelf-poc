@@ -21,7 +21,7 @@ const TIER_Y = Array.from({ length: TIER_COUNT }, (_, index) => 0.48 + index * 0
 const BOOKCASE_HEIGHT = 7.72;
 const BOOKCASE_WIDTH = 7.34;
 const EAVE_HEIGHT = 8.02;
-const TITLE_CHARACTER_LIMIT = 30;
+const TITLE_CHARACTER_LIMIT = 20;
 const TITLE_ATLAS_COLUMNS = 30;
 const TITLE_CELL_WIDTH = 64;
 const TITLE_CELL_HEIGHT = 192;
@@ -42,6 +42,13 @@ function spineTitle(title: string) {
     : `${title.slice(0, TITLE_CHARACTER_LIMIT - 1).trimEnd()}…`;
 }
 
+function spineLabelColors(book: Book) {
+  const bookColor = getBookAppearanceColor(resolveBookAppearance(book));
+  if (bookColor === "#a95147") return { background: "#cb746a", text: "#321b18" };
+  if (bookColor === "#eaad77") return { background: "#d28f5b", text: "#38231b" };
+  return { background: "#dfd9d1", text: "#33251f" };
+}
+
 function BookTitles({ books, visibleSerials }: { books: Book[]; visibleSerials: Set<number> }) {
   const booksByInstance = useMemo(() => books.slice(0, 600), [books]);
   const texture = useMemo(() => {
@@ -51,7 +58,7 @@ function BookTitles({ books, visibleSerials }: { books: Book[]; visibleSerials: 
     canvas.height = Math.max(1, rows * TITLE_CELL_HEIGHT);
     const context = canvas.getContext("2d");
     if (context) {
-      context.font = "600 24px Georgia, serif";
+      context.font = "600 28px Georgia, serif";
       context.textAlign = "center";
       context.textBaseline = "middle";
       context.lineJoin = "round";
@@ -63,11 +70,18 @@ function BookTitles({ books, visibleSerials }: { books: Book[]; visibleSerials: 
         context.save();
         context.translate(centerX, centerY);
         context.rotate(-Math.PI / 2);
-        context.strokeStyle = "rgba(246,245,243,0.62)";
-        context.lineWidth = 3;
-        context.strokeText(spineTitle(book.title), 0, 0, TITLE_CELL_HEIGHT - 18);
-        context.fillStyle = "#241814";
-        context.fillText(spineTitle(book.title), 0, 0, TITLE_CELL_HEIGHT - 18);
+        const title = spineTitle(book.title);
+        const colors = spineLabelColors(book);
+        const maximumTextWidth = TITLE_CELL_HEIGHT - 32;
+        const renderedTextWidth = Math.min(context.measureText(title).width, maximumTextWidth);
+        const labelWidth = renderedTextWidth + 16;
+        const labelHeight = 42;
+        context.fillStyle = colors.background;
+        context.beginPath();
+        context.roundRect(-labelWidth / 2, -labelHeight / 2, labelWidth, labelHeight, labelHeight / 2);
+        context.fill();
+        context.fillStyle = colors.text;
+        context.fillText(title, 0, 0, maximumTextWidth);
         context.restore();
       });
     }
