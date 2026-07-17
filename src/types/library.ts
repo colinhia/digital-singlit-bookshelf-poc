@@ -16,3 +16,43 @@ export interface Bookshelf {
   description: string;
   capacity: number;
 }
+
+export type BookAppearance =
+  | {
+      kind: "solid";
+      backgroundColor: string;
+      textColor: string;
+    }
+  | {
+      kind: "image";
+      assetPath: string;
+      fallbackColor: string;
+      textColor: string;
+    };
+
+export type WallId = "left" | "rear" | "right";
+
+export interface BookSlot {
+  slotNumber: number;
+  wall: WallId;
+  tier: number;
+  positionOnTier: number;
+}
+
+export interface BookcaseWall {
+  id: WallId;
+  capacity: number;
+  tiers: number;
+  slotsPerTier: number;
+}
+
+export interface RoomLayout {
+  totalCapacity: number;
+  walls: BookcaseWall[];
+}
+
+export interface RoomControlsHandle {
+  lock: () => void;
+  unlock: () => void;
+  isLocked: () => boolean;
+}
