@@ -7,6 +7,7 @@ export const TABLE_POSITION: [number, number, number] = [0, 0, -1.25];
 const TABLETOP_RADIUS = 0.73;
 const TABLETOP_HEIGHT = 1.78;
 const TABLETOP_THICKNESS = 0.16;
+export const TABLETOP_SURFACE_HEIGHT = TABLETOP_HEIGHT + TABLETOP_THICKNESS / 2 + 0.006;
 
 export function TiledDisplayTable() {
   const tabletopTexture = useMemo(() => createTileTexture({ columns: 8, rows: 8, brickCentre: true }), []);

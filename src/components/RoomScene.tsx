@@ -5,7 +5,7 @@ import { Canvas, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { PointerLockControls as PointerLockControlsImpl } from "three-stdlib";
-import type { Book, RoomControlsHandle, WallId } from "@/types/library";
+import type { Book, BookSelection, RoomControlsHandle, WallId } from "@/types/library";
 import { roomLayout } from "@/data/room";
 import RoomSurfaces from "@/components/RoomSurfaces";
 import BookCollection from "@/components/BookCollection";
@@ -70,7 +70,7 @@ function RoomArchitecture() {
   </>;
 }
 
-function CameraRig({ mobile, onSelect, target, onControlsReady, onLock, onUnlock }: { mobile: boolean; onSelect: (book: Book) => void; target: Book | null; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
+function CameraRig({ mobile, onSelect, target, onControlsReady, onLock, onUnlock }: { mobile: boolean; onSelect: (selection: BookSelection) => void; target: BookSelection | null; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
   const { camera, gl } = useThree();
   const drag = useRef({ active:false, moved:false, x:0, y:0 });
   const controlsRef = useRef<PointerLockControlsImpl | null>(null);
@@ -109,15 +109,17 @@ function CameraRig({ mobile, onSelect, target, onControlsReady, onLock, onUnlock
   return mobile ? null : <PointerLockControls ref={controlsRef} makeDefault selector="#no-automatic-pointer-lock" onLock={onLock} onUnlock={onUnlock} />;
 }
 
-function Scene({ books, matchingSerials, mobile, onSelect, onTarget, target, onControlsReady, onLock, onUnlock }: { books: Book[]; matchingSerials: Set<number>; mobile: boolean; onSelect: (book: Book) => void; onTarget: (book: Book | null) => void; target: Book | null; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
+function Scene({ books, tableBooks, matchingSerials, mobile, onSelect, onTarget, target, onControlsReady, onLock, onUnlock }: { books: Book[]; tableBooks: Book[]; matchingSerials: Set<number>; mobile: boolean; onSelect: (selection: BookSelection) => void; onTarget: (selection: BookSelection | null) => void; target: BookSelection | null; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
   return <>
     <RoomArchitecture />
     <RoomCentrepiece />
     <BookCollection
       books={books}
+      tableBooks={tableBooks}
       matchingSerials={matchingSerials}
       onSelect={onSelect}
       onTarget={onTarget}
+      target={target}
       shelfWidth={SHELF_WIDTH}
       bookFace={BOOK_FACE}
       tierY={TIER_Y}
@@ -128,13 +130,13 @@ function Scene({ books, matchingSerials, mobile, onSelect, onTarget, target, onC
   </>;
 }
 
-export default function RoomScene({ books, matchingSerials, onSelect, onTarget, target, mobile, onControlsReady, onLock, onUnlock }: { books: Book[]; matchingSerials: Set<number>; onSelect: (book: Book) => void; onTarget: (book: Book | null) => void; target: Book | null; mobile: boolean; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
+export default function RoomScene({ books, tableBooks, matchingSerials, onSelect, onTarget, target, mobile, onControlsReady, onLock, onUnlock }: { books: Book[]; tableBooks: Book[]; matchingSerials: Set<number>; onSelect: (selection: BookSelection) => void; onTarget: (selection: BookSelection | null) => void; target: BookSelection | null; mobile: boolean; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
   const handleCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
     gl.setClearColor("#e8d9c5");
     gl.shadowMap.enabled = !mobile;
     gl.shadowMap.type = THREE.PCFSoftShadowMap;
   }, [mobile]);
   return <Canvas camera={{ position:[0,CAMERA_HEIGHT,0.7], fov:68, near:0.1, far:40 }} dpr={mobile ? [1,1.25] : [1,1.7]} shadows={!mobile} onCreated={handleCreated} gl={{ antialias:true, powerPreference:"high-performance" }}>
-    <Scene books={books} matchingSerials={matchingSerials} mobile={mobile} onSelect={onSelect} onTarget={onTarget} target={target} onControlsReady={onControlsReady} onLock={onLock} onUnlock={onUnlock} />
+    <Scene books={books} tableBooks={tableBooks} matchingSerials={matchingSerials} mobile={mobile} onSelect={onSelect} onTarget={onTarget} target={target} onControlsReady={onControlsReady} onLock={onLock} onUnlock={onUnlock} />
   </Canvas>;
 }

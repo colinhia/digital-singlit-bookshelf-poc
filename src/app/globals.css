@@ -48,6 +48,13 @@ kbd { border:1px solid #f6f5f366; padding:2px 5px; font:8px "Courier New",monosp
 .detail-cover { min-height:430px; display:flex; flex-direction:column; padding:24px; color:var(--book-text-color); background:linear-gradient(90deg,#0003,transparent 15%,transparent 85%,#fff2),var(--book-image,none),var(--book-color); background-size:cover; background-position:center; box-shadow:8px 8px 0 #d1c7b7,14px 14px 22px #0004; }
 .detail-cover span { font-size:8px; letter-spacing:.15em; }.detail-cover strong { margin:auto 0 10px; overflow-wrap:anywhere; font:500 40px/1 Georgia,serif; }.detail-cover small { font:16px Georgia,serif; }.detail-cover b { margin-top:28px; font-size:10px; }
 .detail-copy { align-self:center; }.detail-copy h2 { margin:0; overflow-wrap:anywhere; font:500 50px/.95 Georgia,serif; }.author { color:#655f5b; font:20px Georgia,serif; }
+.detail-navigation { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:12px; margin-bottom:24px; padding-bottom:14px; border-bottom:1px solid #a9514740; }
+.detail-navigation button { border:0; background:transparent; padding:7px 0; color:var(--brick); font-size:10px; letter-spacing:.08em; text-transform:uppercase; cursor:pointer; }
+.detail-navigation button:first-child { text-align:left; }.detail-navigation button:last-child { text-align:right; }
+.detail-navigation button:disabled { color:#8a817a70; cursor:default; }.detail-navigation span { color:#655f5b; font-size:9px; letter-spacing:.1em; }
+.detail-actions { margin-top:26px; }
+.detail-actions button { width:100%; border:1px solid var(--brick); background:var(--brick); color:var(--cream); padding:12px 16px; font-size:10px; letter-spacing:.12em; text-transform:uppercase; cursor:pointer; }
+.detail-actions button:disabled { border-color:#8a817a70; background:#8a817a35; color:#655f5b99; cursor:default; }
 dl { margin-top:38px; border-top:1px solid #d5d1cd; } dl div { display:grid; grid-template-columns:1fr 1.4fr; padding:12px 0; border-bottom:1px solid #dedbd7; font-size:10px; } dt { color:#78716d; } dd { margin:0; }
 .sr-collection { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 @media(max-width:700px){
