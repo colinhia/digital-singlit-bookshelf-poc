@@ -10,6 +10,13 @@ export interface Book {
   callNumber: string;
 }
 
+export type BookLocation = "shelf" | "table";
+
+export interface BookSelection {
+  book: Book;
+  location: BookLocation;
+}
+
 export interface Bookshelf {
   id: string;
   name: string;

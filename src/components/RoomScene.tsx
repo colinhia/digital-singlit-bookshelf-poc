@@ -2,10 +2,10 @@
 
 import { PointerLockControls, Text } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import type { PointerLockControls as PointerLockControlsImpl } from "three-stdlib";
-import type { Book, RoomControlsHandle, WallId } from "@/types/library";
+import type { Book, BookSelection, RoomControlsHandle, WallId } from "@/types/library";
 import { roomLayout } from "@/data/room";
 import RoomSurfaces from "@/components/RoomSurfaces";
 import BookCollection from "@/components/BookCollection";
@@ -35,23 +35,6 @@ function Bookcase({ wall }: { wall: WallId }) {
   </group>;
 }
 
-function Vines() {
-  const pieces = useMemo(() => Array.from({ length: 72 }, (_, index) => {
-    const wall = index % 3;
-    const t = ((index * 37) % 100) / 100;
-    const y = EAVE_HEIGHT + 0.18 - ((index * 13) % 18) / 100;
-    const vineFace = ROOM_HALF - 0.08;
-    const vineSpan = ROOM_HALF * 1.84;
-    if (wall === 0) return { position: [-vineFace, y, -vineSpan / 2 + t * vineSpan] as [number,number,number], rotation: [0, 0, Math.PI / 2] as [number,number,number] };
-    if (wall === 1) return { position: [-vineSpan / 2 + t * vineSpan, y, -vineFace] as [number,number,number], rotation: [0, 0, 0] as [number,number,number] };
-    return { position: [vineFace, y, -vineSpan / 2 + t * vineSpan] as [number,number,number], rotation: [0, 0, Math.PI / 2] as [number,number,number] };
-  }), []);
-  return <group>{pieces.map((piece, index) => <group key={index} position={piece.position} rotation={piece.rotation}>
-    <mesh scale={[0.13,0.24,0.06]}><sphereGeometry args={[1,8,6]} /><meshStandardMaterial color={index % 4 ? "#315234" : "#203d2b"} roughness={1} /></mesh>
-    {index % 3 === 0 && <mesh position={[0.08,0.03,0.05]} scale={0.07}><sphereGeometry args={[1,8,6]} /><meshStandardMaterial color={index % 2 ? "#a95147" : "#d86f78"} /></mesh>}
-  </group>)}</group>;
-}
-
 function RoomArchitecture() {
   return <>
     <color attach="background" args={["#e8d9c5"]} />
@@ -66,11 +49,10 @@ function RoomArchitecture() {
     <mesh position={[0,2.45,ROOM_HALF-0.4]}><boxGeometry args={[1.72,4.22,0.15]} /><meshStandardMaterial color="#b36d46" roughness={0.86} /></mesh>
     <Text position={[0,2.5,ROOM_HALF-0.52]} rotation={[0,Math.PI,0]} fontSize={0.18} color="#f4e7d0" letterSpacing={0.2}>THE DOOR</Text>
     <Bookcase wall="left" /><Bookcase wall="rear" /><Bookcase wall="right" />
-    <Vines />
   </>;
 }
 
-function CameraRig({ mobile, onSelect, target, onControlsReady, onLock, onUnlock }: { mobile: boolean; onSelect: (book: Book) => void; target: Book | null; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
+function CameraRig({ mobile, onSelect, target, onControlsReady, onLock, onUnlock }: { mobile: boolean; onSelect: (selection: BookSelection) => void; target: BookSelection | null; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
   const { camera, gl } = useThree();
   const drag = useRef({ active:false, moved:false, x:0, y:0 });
   const controlsRef = useRef<PointerLockControlsImpl | null>(null);
@@ -109,15 +91,17 @@ function CameraRig({ mobile, onSelect, target, onControlsReady, onLock, onUnlock
   return mobile ? null : <PointerLockControls ref={controlsRef} makeDefault selector="#no-automatic-pointer-lock" onLock={onLock} onUnlock={onUnlock} />;
 }
 
-function Scene({ books, matchingSerials, mobile, onSelect, onTarget, target, onControlsReady, onLock, onUnlock }: { books: Book[]; matchingSerials: Set<number>; mobile: boolean; onSelect: (book: Book) => void; onTarget: (book: Book | null) => void; target: Book | null; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
+function Scene({ books, tableBooks, matchingSerials, mobile, onSelect, onTarget, target, onControlsReady, onLock, onUnlock }: { books: Book[]; tableBooks: Book[]; matchingSerials: Set<number>; mobile: boolean; onSelect: (selection: BookSelection) => void; onTarget: (selection: BookSelection | null) => void; target: BookSelection | null; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
   return <>
     <RoomArchitecture />
     <RoomCentrepiece />
     <BookCollection
       books={books}
+      tableBooks={tableBooks}
       matchingSerials={matchingSerials}
       onSelect={onSelect}
       onTarget={onTarget}
+      target={target}
       shelfWidth={SHELF_WIDTH}
       bookFace={BOOK_FACE}
       tierY={TIER_Y}
@@ -128,13 +112,13 @@ function Scene({ books, matchingSerials, mobile, onSelect, onTarget, target, onC
   </>;
 }
 
-export default function RoomScene({ books, matchingSerials, onSelect, onTarget, target, mobile, onControlsReady, onLock, onUnlock }: { books: Book[]; matchingSerials: Set<number>; onSelect: (book: Book) => void; onTarget: (book: Book | null) => void; target: Book | null; mobile: boolean; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
+export default function RoomScene({ books, tableBooks, matchingSerials, onSelect, onTarget, target, mobile, onControlsReady, onLock, onUnlock }: { books: Book[]; tableBooks: Book[]; matchingSerials: Set<number>; onSelect: (selection: BookSelection) => void; onTarget: (selection: BookSelection | null) => void; target: BookSelection | null; mobile: boolean; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
   const handleCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
     gl.setClearColor("#e8d9c5");
     gl.shadowMap.enabled = !mobile;
     gl.shadowMap.type = THREE.PCFSoftShadowMap;
   }, [mobile]);
   return <Canvas camera={{ position:[0,CAMERA_HEIGHT,0.7], fov:68, near:0.1, far:40 }} dpr={mobile ? [1,1.25] : [1,1.7]} shadows={!mobile} onCreated={handleCreated} gl={{ antialias:true, powerPreference:"high-performance" }}>
-    <Scene books={books} matchingSerials={matchingSerials} mobile={mobile} onSelect={onSelect} onTarget={onTarget} target={target} onControlsReady={onControlsReady} onLock={onLock} onUnlock={onUnlock} />
+    <Scene books={books} tableBooks={tableBooks} matchingSerials={matchingSerials} mobile={mobile} onSelect={onSelect} onTarget={onTarget} target={target} onControlsReady={onControlsReady} onLock={onLock} onUnlock={onUnlock} />
   </Canvas>;
 }

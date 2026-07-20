@@ -4,9 +4,10 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three-stdlib";
-import type { Book, BookRenderProfile, BookSlot } from "@/types/library";
+import type { Book, BookRenderProfile, BookSelection, BookSlot } from "@/types/library";
 import { bookSlots } from "@/data/room";
 import { getBookAppearanceColor, resolveBookAppearance } from "@/data/bookAppearance";
+import { TABLE_POSITION, TABLETOP_SURFACE_HEIGHT } from "@/components/room-decor/TiledDisplayTable";
 
 const TITLE_CHARACTER_LIMIT = 20;
 const TITLE_ATLAS_COLUMNS = 30;
@@ -238,12 +239,83 @@ function BookTitles({ items, matchingSerials, config }: { items: ProfiledBook[];
   </>;
 }
 
-function RealisticBooks({ items, matchingSerials, config, onSelect, onTarget }: {
+function sameSelection(left: BookSelection | null, right: BookSelection | null) {
+  return left?.location === right?.location && left?.book.serialNumber === right?.book.serialNumber;
+}
+
+function TableBookStack({ books, target, groupRef, geometries }: {
+  books: Book[];
+  target: BookSelection | null;
+  groupRef: React.RefObject<THREE.Group>;
+  geometries: { spine: THREE.BufferGeometry; pages: THREE.BufferGeometry; boards: THREE.BufferGeometry };
+}) {
+  const entries = useMemo(() => {
+    let stackHeight = 0;
+    return books.map((book) => {
+      const profile = resolveBookRenderProfile(book);
+      const centreY = stackHeight + profile.width / 2;
+      stackHeight += profile.width + 0.008;
+      return { book, profile, centreY };
+    });
+  }, [books]);
+
+  return <group
+    ref={groupRef}
+    position={[TABLE_POSITION[0], TABLE_POSITION[1] + TABLETOP_SURFACE_HEIGHT, TABLE_POSITION[2]]}
+  >
+    {entries.map(({ book, profile, centreY }, index) => {
+      const highlighted = target?.location === "table" && target.book.serialNumber === book.serialNumber;
+      const coverColor = highlighted ? HIGHLIGHT_COLOR : getBookAppearanceColor(resolveBookAppearance(book));
+      const pageColor = PAGE_COLORS[hashNumber(book.serialNumber, 0x5a17) % PAGE_COLORS.length];
+      const spineDepth = profile.binding === "hardcover" ? 0.034 : 0.024;
+      const pageHeightInset = profile.binding === "hardcover" ? 0.044 : 0.018;
+      const pageWidthInset = profile.binding === "hardcover" ? profile.coverThickness * 2.35 : 0.012;
+      const boardX = profile.width / 2 - profile.coverThickness / 2;
+      const hitData = { tableBookIndex: index };
+      return <group key={book.serialNumber} position={[0, centreY, 0]} rotation={[0, 0, -Math.PI / 2]}>
+        <mesh
+          geometry={geometries.pages}
+          scale={[profile.width - pageWidthInset, profile.height - pageHeightInset, profile.depth - profile.pageInset]}
+          position={[0, 0, -profile.pageInset / 2]}
+          userData={hitData}
+          receiveShadow
+        >
+          <meshStandardMaterial color={pageColor} roughness={0.92} metalness={0} />
+        </mesh>
+        <mesh
+          geometry={geometries.spine}
+          scale={[profile.width, profile.height, spineDepth]}
+          position={[0, 0, profile.depth / 2 - spineDepth / 2 + 0.001]}
+          userData={hitData}
+          castShadow
+          receiveShadow
+        >
+          <meshStandardMaterial color={coverColor} roughness={0.64} metalness={0.015} />
+        </mesh>
+        {[-boardX, boardX].map((x) => <mesh
+          key={x}
+          geometry={geometries.boards}
+          scale={[profile.coverThickness, profile.height, profile.depth]}
+          position={[x, 0, 0]}
+          userData={hitData}
+          castShadow
+          receiveShadow
+        >
+          <meshStandardMaterial color={coverColor} roughness={0.74} metalness={0.01} />
+        </mesh>)}
+      </group>;
+    })}
+  </group>;
+}
+
+function RealisticBooks({ items, tableBooks, matchingSerials, config, onSelect, onTarget, target }: {
   items: ProfiledBook[];
+  tableBooks: Book[];
   matchingSerials: Set<number>;
   config: BookRenderConfig;
-  onSelect: (book: Book) => void;
-  onTarget: (book: Book | null) => void;
+  onSelect: (selection: BookSelection) => void;
+  onTarget: (selection: BookSelection | null) => void;
+  target: BookSelection | null;
 }) {
   const matchingSpineRef = useRef<THREE.InstancedMesh>(null);
   const matchingPagesRef = useRef<THREE.InstancedMesh>(null);
@@ -251,7 +323,8 @@ function RealisticBooks({ items, matchingSerials, config, onSelect, onTarget }: 
   const filteredSpineRef = useRef<THREE.InstancedMesh>(null);
   const filteredPagesRef = useRef<THREE.InstancedMesh>(null);
   const filteredBoardsRef = useRef<THREE.InstancedMesh>(null);
-  const targetRef = useRef<Book | null>(null);
+  const tableGroupRef = useRef<THREE.Group>(null);
+  const targetRef = useRef<BookSelection | null>(null);
   const targetIndexRef = useRef<number | null>(null);
   const { camera } = useThree();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
@@ -341,7 +414,12 @@ function RealisticBooks({ items, matchingSerials, config, onSelect, onTarget }: 
 
   useEffect(() => {
     const currentTarget = targetRef.current;
-    if (!currentTarget || matchingSerials.has(currentTarget.serialNumber)) return;
+    if (!currentTarget) return;
+    const remainsTargetable = currentTarget.location === "table"
+      ? tableBooks.some((book) => book.serialNumber === currentTarget.book.serialNumber)
+      : items.some((item) => item.book.serialNumber === currentTarget.book.serialNumber)
+        && matchingSerials.has(currentTarget.book.serialNumber);
+    if (remainsTargetable) return;
     if (targetIndexRef.current !== null) {
       const previous = items[targetIndexRef.current];
       if (previous) setCoverColor(targetIndexRef.current, getBookAppearanceColor(resolveBookAppearance(previous.book)));
@@ -351,24 +429,38 @@ function RealisticBooks({ items, matchingSerials, config, onSelect, onTarget }: 
     targetIndexRef.current = null;
     targetRef.current = null;
     onTarget(null);
-  }, [items, matchingSerials, onTarget]);
+  }, [items, matchingSerials, onTarget, tableBooks]);
 
   useFrame(() => {
     const matchingSpine = matchingSpineRef.current;
     const filteredSpine = filteredSpineRef.current;
     if (!matchingSpine || !filteredSpine) return;
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-    const hit = raycaster.intersectObjects([matchingSpine, filteredSpine], false)[0];
-    const nextIndex = hit?.instanceId ?? null;
-    const nextItem = nextIndex !== null ? items[nextIndex] : null;
-    const next = nextItem && matchingSerials.has(nextItem.book.serialNumber) ? nextItem.book : null;
-    if (next?.serialNumber === targetRef.current?.serialNumber) return;
+    const targets: THREE.Object3D[] = [matchingSpine, filteredSpine];
+    if (tableGroupRef.current) targets.push(tableGroupRef.current);
+    const hit = raycaster.intersectObjects(targets, true)[0];
+    let nextIndex: number | null = null;
+    let next: BookSelection | null = null;
+    if (hit?.object === matchingSpine && hit.instanceId !== undefined) {
+      nextIndex = hit.instanceId;
+      const nextItem = items[nextIndex];
+      if (nextItem && matchingSerials.has(nextItem.book.serialNumber)) {
+        next = { book: nextItem.book, location: "shelf" };
+      }
+    } else if (hit?.object !== filteredSpine && hit) {
+      let object: THREE.Object3D | null = hit.object;
+      while (object && typeof object.userData.tableBookIndex !== "number") object = object.parent;
+      const tableIndex = object?.userData.tableBookIndex;
+      const book = typeof tableIndex === "number" ? tableBooks[tableIndex] : null;
+      if (book) next = { book, location: "table" };
+    }
+    if (sameSelection(next, targetRef.current)) return;
 
     if (targetIndexRef.current !== null) {
       const previous = items[targetIndexRef.current];
       if (previous) setCoverColor(targetIndexRef.current, getBookAppearanceColor(resolveBookAppearance(previous.book)));
     }
-    targetIndexRef.current = next ? nextIndex : null;
+    targetIndexRef.current = next?.location === "shelf" ? nextIndex : null;
     if (targetIndexRef.current !== null) setCoverColor(targetIndexRef.current, HIGHLIGHT_COLOR);
     if (matchingSpine.instanceColor) matchingSpine.instanceColor.needsUpdate = true;
     if (matchingBoardsRef.current?.instanceColor) matchingBoardsRef.current.instanceColor.needsUpdate = true;
@@ -403,14 +495,17 @@ function RealisticBooks({ items, matchingSerials, config, onSelect, onTarget }: 
     <instancedMesh ref={filteredSpineRef} args={[geometries.spine, undefined, items.length]} receiveShadow renderOrder={2}>
       <meshStandardMaterial color="#ffffff" roughness={0.64} metalness={0.015} transparent opacity={FILTERED_BOOK_OPACITY} depthWrite />
     </instancedMesh>
+    <TableBookStack books={tableBooks} target={target} groupRef={tableGroupRef} geometries={geometries} />
   </>;
 }
 
-export default function BookCollection({ books, matchingSerials, onSelect, onTarget, shelfWidth, bookFace, tierY, slotsPerTier, capacity }: {
+export default function BookCollection({ books, tableBooks, matchingSerials, onSelect, onTarget, target, shelfWidth, bookFace, tierY, slotsPerTier, capacity }: {
   books: Book[];
+  tableBooks: Book[];
   matchingSerials: Set<number>;
-  onSelect: (book: Book) => void;
-  onTarget: (book: Book | null) => void;
+  onSelect: (selection: BookSelection) => void;
+  onTarget: (selection: BookSelection | null) => void;
+  target: BookSelection | null;
   shelfWidth: number;
   bookFace: number;
   tierY: number[];
@@ -420,7 +515,7 @@ export default function BookCollection({ books, matchingSerials, onSelect, onTar
   const config = useMemo<BookRenderConfig>(() => ({ shelfWidth, bookFace, tierY, slotsPerTier, capacity }), [bookFace, capacity, shelfWidth, slotsPerTier, tierY]);
   const items = useMemo(() => getProfiledBooks(books, capacity), [books, capacity]);
   return <>
-    <RealisticBooks items={items} matchingSerials={matchingSerials} config={config} onSelect={onSelect} onTarget={onTarget} />
+    <RealisticBooks items={items} tableBooks={tableBooks} matchingSerials={matchingSerials} config={config} onSelect={onSelect} onTarget={onTarget} target={target} />
     <BookTitles items={items} matchingSerials={matchingSerials} config={config} />
   </>;
 }
