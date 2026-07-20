@@ -10,6 +10,7 @@ import { roomLayout } from "@/data/room";
 import RoomSurfaces from "@/components/RoomSurfaces";
 import BookCollection from "@/components/BookCollection";
 import RoomCentrepiece from "@/components/RoomCentrepiece";
+import { EntranceFoliage, PerimeterFoliage } from "@/components/room-decor/EntranceFoliage";
 import { VintageGate } from "@/components/room-decor/VintageGate";
 
 const ROOM_HALF = 3.84;
@@ -47,6 +48,8 @@ function RoomArchitecture() {
     <mesh position={[0,6.9,ROOM_HALF-0.12]}><boxGeometry args={[ROOM_HALF * 2,0.32,0.14]} /><meshStandardMaterial color="#a95147" /></mesh>
     <mesh position={[0,0.45,ROOM_HALF-0.12]}><boxGeometry args={[ROOM_HALF * 2,0.7,0.15]} /><meshStandardMaterial color="#a95147" /></mesh>
     <VintageGate position={[0, 0, ROOM_HALF - 0.33]} />
+    <EntranceFoliage position={[0, 0, ROOM_HALF - 0.62]} />
+    <PerimeterFoliage roomHalf={ROOM_HALF} bookcaseFace={BOOKCASE_FACE} bookcaseWidth={BOOKCASE_WIDTH} tierY={TIER_Y} />
     <Bookcase wall="left" /><Bookcase wall="rear" /><Bookcase wall="right" />
   </>;
 }
