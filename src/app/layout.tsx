@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Noto_Sans, Noto_Sans_SC, Noto_Sans_Tamil } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const notoSans = Noto_Sans({
@@ -31,5 +32,5 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const fontVariables = `${notoSans.variable} ${notoSansSC.variable} ${notoSansTamil.variable}`;
-  return <html lang="en" className={fontVariables}><body>{children}</body></html>;
+  return <html lang="en" className={fontVariables}><body>{children}<Analytics /></body></html>;
 }
