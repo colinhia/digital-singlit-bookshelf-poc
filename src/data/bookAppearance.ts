@@ -1,9 +1,10 @@
 import type { Book, BookAppearance } from "@/types/library";
 
 export const BOOK_PALETTE = [
-  { backgroundColor: "#f6f5f3", textColor: "#5b2f2a" },
-  { backgroundColor: "#eaad77", textColor: "#5b2f2a" },
-  { backgroundColor: "#a95147", textColor: "#f6f5f3" },
+  { backgroundColor: "#4a2c24", textColor: "#d8cfbf" },
+  { backgroundColor: "#642a35", textColor: "#d8cfbf" },
+  { backgroundColor: "#243a5a", textColor: "#d8cfbf" },
+  { backgroundColor: "#2f4a3a", textColor: "#d8cfbf" },
 ] as const;
 
 function hashSerialNumber(serialNumber: number) {

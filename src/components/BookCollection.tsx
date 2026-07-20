@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three-stdlib";
@@ -11,11 +11,37 @@ import { TABLE_POSITION, TABLETOP_SURFACE_HEIGHT } from "@/components/room-decor
 
 const TITLE_CHARACTER_LIMIT = 20;
 const TITLE_ATLAS_COLUMNS = 30;
-const TITLE_CELL_WIDTH = 64;
-const TITLE_CELL_HEIGHT = 192;
-const HIGHLIGHT_COLOR = "#f0c98e";
+const TITLE_CELL_WIDTH = 128;
+const TITLE_CELL_HEIGHT = 384;
+const TITLE_MAX_FONT_SIZE = 48;
+const TITLE_MIN_FONT_SIZE = 40;
+const TITLE_FONT_WEIGHT = 700;
+const TITLE_ACCENT_COLOR = "#c7a46b";
+const TITLE_TEXT_COLOR = "#d8cfbf";
+const HIGHLIGHT_COLOR = "#75412a";
 const FILTERED_BOOK_OPACITY = 0.25;
 const PAGE_COLORS = ["#eadfce", "#f2e8d8", "#ded1be", "#e7dac7"];
+const FALLBACK_FONT_FAMILY = "Arial, sans-serif";
+
+type SpineFontFamilies = Record<Book["language"], string>;
+
+const FALLBACK_FONT_FAMILIES: SpineFontFamilies = {
+  Chinese: FALLBACK_FONT_FAMILY,
+  English: FALLBACK_FONT_FAMILY,
+  Malay: FALLBACK_FONT_FAMILY,
+  Tamil: FALLBACK_FONT_FAMILY,
+};
+
+const FONT_VARIABLES: Record<Book["language"], string> = {
+  Chinese: "--font-spine-chinese",
+  English: "--font-spine-latin",
+  Malay: "--font-spine-latin",
+  Tamil: "--font-spine-tamil",
+};
+
+const graphemeSegmenter = typeof Intl.Segmenter === "function"
+  ? new Intl.Segmenter(undefined, { granularity: "grapheme" })
+  : null;
 
 interface BookRenderConfig {
   shelfWidth: number;
@@ -101,73 +127,149 @@ function layerMatrix(
     .multiply(new THREE.Matrix4().makeScale(width, height, depth));
 }
 
+function splitGraphemes(value: string) {
+  return graphemeSegmenter
+    ? Array.from(graphemeSegmenter.segment(value), ({ segment }) => segment)
+    : Array.from(value);
+}
+
 function spineTitle(title: string) {
-  return title.length <= TITLE_CHARACTER_LIMIT
+  const graphemes = splitGraphemes(title);
+  return graphemes.length <= TITLE_CHARACTER_LIMIT
     ? title
-    : `${title.slice(0, TITLE_CHARACTER_LIMIT - 1).trimEnd()}…`;
+    : `${graphemes.slice(0, TITLE_CHARACTER_LIMIT - 1).join("").trimEnd()}…`;
+}
+
+function resolveSpineFontFamilies() {
+  const styles = getComputedStyle(document.documentElement);
+  return Object.fromEntries(Object.entries(FONT_VARIABLES).map(([language, variable]) => {
+    const family = styles.getPropertyValue(variable).trim();
+    return [language, family ? `${family}, ${FALLBACK_FONT_FAMILY}` : FALLBACK_FONT_FAMILY];
+  })) as SpineFontFamilies;
+}
+
+function fontDeclaration(fontSize: number, family: string) {
+  return `${TITLE_FONT_WEIGHT} ${fontSize}px ${family}`;
+}
+
+function useSpineFontFamilies(items: ProfiledBook[]) {
+  const [fontFamilies, setFontFamilies] = useState<SpineFontFamilies>(FALLBACK_FONT_FAMILIES);
+
+  useEffect(() => {
+    let active = true;
+    const resolvedFamilies = resolveSpineFontFamilies();
+    const loads = (Object.keys(resolvedFamilies) as Book["language"][]).map((language) => {
+      const sample = Array.from(new Set(items
+        .filter(({ book }) => book.language === language)
+        .flatMap(({ book }) => splitGraphemes(book.title))))
+        .join("") || language;
+      return document.fonts.load(fontDeclaration(TITLE_MAX_FONT_SIZE, resolvedFamilies[language]), sample);
+    });
+
+    Promise.allSettled(loads).then(() => {
+      if (active) setFontFamilies(resolvedFamilies);
+    });
+
+    return () => { active = false; };
+  }, [items]);
+
+  return fontFamilies;
 }
 
 function wrapSpineTitle(context: CanvasRenderingContext2D, title: string, maximumWidth: number) {
   if (context.measureText(title).width <= maximumWidth) return [title];
 
-  const midpoint = title.length / 2;
-  const spaces = title.split("").reduce<number[]>((indices, character, index) => {
-    if (/\s/.test(character)) indices.push(index);
-    return indices;
-  }, []);
-  const splitAt = spaces.length > 0
-    ? spaces.reduce((closest, index) => Math.abs(index - midpoint) < Math.abs(closest - midpoint) ? index : closest)
-    : Math.ceil(midpoint);
+  const graphemes = splitGraphemes(title);
+  const whitespaceBreaks = graphemes.flatMap((grapheme, index) => /\s/.test(grapheme) ? [index] : []);
+  const candidates = whitespaceBreaks.length > 0
+    ? whitespaceBreaks
+    : Array.from({ length: Math.max(0, graphemes.length - 1) }, (_, index) => index + 1);
 
-  return [title.slice(0, splitAt).trim(), title.slice(splitAt).trim()].filter(Boolean);
+  const best = candidates.reduce<{ lines: string[]; width: number } | null>((current, splitAt) => {
+    const lines = whitespaceBreaks.length > 0
+      ? [graphemes.slice(0, splitAt).join("").trim(), graphemes.slice(splitAt + 1).join("").trim()]
+      : [graphemes.slice(0, splitAt).join(""), graphemes.slice(splitAt).join("")];
+    const width = Math.max(...lines.map((line) => context.measureText(line).width));
+    return !current || width < current.width ? { lines, width } : current;
+  }, null);
+
+  return best?.lines.filter(Boolean) ?? [title];
 }
 
-function spineTypographyColors(book: Book) {
-  const bookColor = getBookAppearanceColor(resolveBookAppearance(book));
-  if (bookColor === "#a95147") return { text: "#e2d2c4", accent: "#eaad77" };
-  if (bookColor === "#eaad77") return { text: "#38231b", accent: "#f6f5f3" };
-  return { text: "#33251f", accent: "#a95147" };
+function fitSpineTitle(
+  context: CanvasRenderingContext2D,
+  title: string,
+  maximumWidth: number,
+  fontFamily: string,
+) {
+  for (let fontSize = TITLE_MAX_FONT_SIZE; fontSize >= TITLE_MIN_FONT_SIZE; fontSize -= 2) {
+    context.font = fontDeclaration(fontSize, fontFamily);
+    const lines = wrapSpineTitle(context, title, maximumWidth);
+    if (lines.every((line) => context.measureText(line).width <= maximumWidth)) return { fontSize, lines };
+  }
+
+  context.font = fontDeclaration(TITLE_MIN_FONT_SIZE, fontFamily);
+  const graphemes = splitGraphemes(title.replace(/…$/, ""));
+  for (let length = graphemes.length - 1; length > 0; length -= 1) {
+    const shortened = `${graphemes.slice(0, length).join("").trimEnd()}…`;
+    const lines = wrapSpineTitle(context, shortened, maximumWidth);
+    if (lines.every((line) => context.measureText(line).width <= maximumWidth)) {
+      return { fontSize: TITLE_MIN_FONT_SIZE, lines };
+    }
+  }
+
+  return { fontSize: TITLE_MIN_FONT_SIZE, lines: ["…"] };
 }
 
-function BookTitles({ items, matchingSerials, config }: { items: ProfiledBook[]; matchingSerials: Set<number>; config: BookRenderConfig }) {
+function BookTitleBatch({
+  items,
+  matchingSerials,
+  config,
+  fontFamilies,
+  columns,
+}: {
+  items: ProfiledBook[];
+  matchingSerials: Set<number>;
+  config: BookRenderConfig;
+  fontFamilies: SpineFontFamilies;
+  columns: number;
+}) {
   const texture = useMemo(() => {
-    const rows = Math.max(1, Math.ceil(items.length / TITLE_ATLAS_COLUMNS));
+    const rows = Math.max(1, Math.ceil(items.length / columns));
     const canvas = document.createElement("canvas");
-    canvas.width = TITLE_ATLAS_COLUMNS * TITLE_CELL_WIDTH;
+    canvas.width = columns * TITLE_CELL_WIDTH;
     canvas.height = rows * TITLE_CELL_HEIGHT;
     const context = canvas.getContext("2d");
     if (context) {
-      context.font = "600 22px Georgia, serif";
       context.textAlign = "center";
       context.textBaseline = "middle";
       context.lineJoin = "round";
       items.forEach(({ book }, index) => {
-        const column = index % TITLE_ATLAS_COLUMNS;
-        const row = Math.floor(index / TITLE_ATLAS_COLUMNS);
+        const column = index % columns;
+        const row = Math.floor(index / columns);
         const centerX = column * TITLE_CELL_WIDTH + TITLE_CELL_WIDTH / 2;
         const centerY = row * TITLE_CELL_HEIGHT + TITLE_CELL_HEIGHT / 2;
         const title = spineTitle(book.title);
-        const colors = spineTypographyColors(book);
         const labelWidth = TITLE_CELL_HEIGHT;
-        const labelHeight = 42;
-        const outerRuleOffset = labelWidth / 2 - 9;
-        const innerRuleOffset = labelWidth / 2 - 17;
-        const maximumTextWidth = innerRuleOffset * 2 - 14;
-        const titleLines = wrapSpineTitle(context, title, maximumTextWidth);
+        const labelHeight = 104;
+        const ruleOffset = labelWidth / 2 - 22;
+        const maximumTextWidth = ruleOffset * 2 - 24;
+        const fittedTitle = fitSpineTitle(context, title, maximumTextWidth, fontFamilies[book.language]);
         context.save();
         context.translate(centerX, centerY);
         context.rotate(-Math.PI / 2);
-        context.fillStyle = colors.accent;
-        context.globalAlpha = 0.72;
-        [-outerRuleOffset, -innerRuleOffset, innerRuleOffset, outerRuleOffset].forEach((offset) => {
-          context.fillRect(offset - 1.5, -labelHeight / 2, 3, labelHeight);
+        context.fillStyle = TITLE_ACCENT_COLOR;
+        context.globalAlpha = 0.68;
+        [-ruleOffset, ruleOffset].forEach((offset) => {
+          context.fillRect(offset - 2, -labelHeight / 2, 4, labelHeight);
         });
         context.globalAlpha = 1;
-        context.fillStyle = colors.text;
-        const lineHeight = 21;
-        const firstLineY = -((titleLines.length - 1) * lineHeight) / 2;
-        titleLines.forEach((line, lineIndex) => {
-          context.fillText(line, 0, firstLineY + lineIndex * lineHeight, maximumTextWidth);
+        context.fillStyle = TITLE_TEXT_COLOR;
+        context.font = fontDeclaration(fittedTitle.fontSize, fontFamilies[book.language]);
+        const lineHeight = fittedTitle.fontSize * 1.05;
+        const firstLineY = -((fittedTitle.lines.length - 1) * lineHeight) / 2;
+        fittedTitle.lines.forEach((line, lineIndex) => {
+          context.fillText(line, 0, firstLineY + lineIndex * lineHeight);
         });
         context.restore();
       });
@@ -178,10 +280,10 @@ function BookTitles({ items, matchingSerials, config }: { items: ProfiledBook[];
     atlas.magFilter = THREE.LinearFilter;
     atlas.generateMipmaps = false;
     return atlas;
-  }, [items]);
+  }, [columns, fontFamilies, items]);
 
   const geometries = useMemo(() => {
-    const rows = Math.max(1, Math.ceil(items.length / TITLE_ATLAS_COLUMNS));
+    const rows = Math.max(1, Math.ceil(items.length / columns));
     const createGeometry = (matchesFilter: boolean) => {
       const positions: number[] = [];
       const uvs: number[] = [];
@@ -192,7 +294,7 @@ function BookTitles({ items, matchingSerials, config }: { items: ProfiledBook[];
         const { profile } = item;
         const transform = baseMatrix(item, config);
         const firstVertex = positions.length / 3;
-        const halfWidth = profile.width * 0.38;
+        const halfWidth = profile.width * 0.44;
         const bottom = 0;
         const top = profile.height;
         const front = profile.depth / 2 + 0.006;
@@ -204,10 +306,10 @@ function BookTitles({ items, matchingSerials, config }: { items: ProfiledBook[];
           vertex.set(...corner).applyMatrix4(transform);
           positions.push(vertex.x, vertex.y, vertex.z);
         });
-        const column = index % TITLE_ATLAS_COLUMNS;
-        const row = Math.floor(index / TITLE_ATLAS_COLUMNS);
-        const u0 = column / TITLE_ATLAS_COLUMNS;
-        const u1 = (column + 1) / TITLE_ATLAS_COLUMNS;
+        const column = index % columns;
+        const row = Math.floor(index / columns);
+        const u0 = column / columns;
+        const u1 = (column + 1) / columns;
         const vTop = 1 - row / rows;
         const vBottom = 1 - (row + 1) / rows;
         uvs.push(u0, vBottom, u1, vBottom, u1, vTop, u0, vTop);
@@ -221,7 +323,7 @@ function BookTitles({ items, matchingSerials, config }: { items: ProfiledBook[];
       return result;
     };
     return { matching: createGeometry(true), filtered: createGeometry(false) };
-  }, [config, items, matchingSerials]);
+  }, [columns, config, items, matchingSerials]);
 
   useEffect(() => () => texture.dispose(), [texture]);
   useEffect(() => () => {
@@ -237,6 +339,28 @@ function BookTitles({ items, matchingSerials, config }: { items: ProfiledBook[];
       <meshBasicMaterial map={texture} transparent alphaTest={0.12} depthWrite={false} toneMapped={false} side={THREE.FrontSide} />
     </mesh>
   </>;
+}
+
+function BookTitles({ items, matchingSerials, config }: { items: ProfiledBook[]; matchingSerials: Set<number>; config: BookRenderConfig }) {
+  const { gl } = useThree();
+  const fontFamilies = useSpineFontFamilies(items);
+  const maximumTextureSize = gl.capabilities.maxTextureSize;
+  const columns = Math.max(1, Math.min(TITLE_ATLAS_COLUMNS, Math.floor(maximumTextureSize / TITLE_CELL_WIDTH)));
+  const rows = Math.max(1, Math.floor(maximumTextureSize / TITLE_CELL_HEIGHT));
+  const batchCapacity = columns * rows;
+  const batches = useMemo(() => Array.from(
+    { length: Math.ceil(items.length / batchCapacity) },
+    (_, index) => items.slice(index * batchCapacity, (index + 1) * batchCapacity),
+  ), [batchCapacity, items]);
+
+  return <>{batches.map((batch, index) => <BookTitleBatch
+    key={`${index}-${batch[0]?.book.serialNumber ?? "empty"}`}
+    items={batch}
+    matchingSerials={matchingSerials}
+    config={config}
+    fontFamilies={fontFamilies}
+    columns={columns}
+  />)}</>;
 }
 
 function sameSelection(left: BookSelection | null, right: BookSelection | null) {
