@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import type { Book, BookSelection, Bookshelf, RoomControlsHandle } from "@/types/library";
@@ -10,8 +11,8 @@ import { resolveAdjacentBooks, resolveShelfBooks, resolveTableBooks, TABLE_BOOK_
 const RoomScene = dynamic(() => import("@/components/RoomScene"), { ssr:false, loading:() => <div className="room-loading">Preparing the room…</div> });
 
 type BookField = keyof Book;
-type RoomMode = "filters" | "resume" | "moving" | "info";
-type LockOrigin = Exclude<RoomMode, "moving"> | null;
+type RoomMode = "filters" | "resume" | "moving" | "info" | "borrow";
+type LockOrigin = Exclude<RoomMode, "moving" | "borrow"> | null;
 
 interface ViewTransitionDocument extends Document {
   startViewTransition?: (update: () => void) => void;
@@ -30,14 +31,16 @@ type RoomAction =
   | { type: "UNLOCKED" }
   | { type: "SHOW_RESUME" }
   | { type: "OPEN_INFO"; selection: BookSelection }
-  | { type: "NAVIGATE_INFO"; selection: BookSelection };
+  | { type: "NAVIGATE_INFO"; selection: BookSelection }
+  | { type: "OPEN_BORROW" }
+  | { type: "CLOSE_BORROW" };
 
 const initialRoomState: RoomState = { mode: "filters", selection: null, pendingLockFrom: null };
 
 function roomReducer(state: RoomState, action: RoomAction): RoomState {
   switch (action.type) {
     case "REQUEST_LOCK":
-      return state.mode !== "moving" && state.pendingLockFrom === null
+      return state.mode !== "moving" && state.mode !== "borrow" && state.pendingLockFrom === null
         ? { ...state, pendingLockFrom: state.mode }
         : state;
     case "LOCK_ACQUIRED":
@@ -61,6 +64,14 @@ function roomReducer(state: RoomState, action: RoomAction): RoomState {
     case "NAVIGATE_INFO":
       return state.mode === "info" && state.selection?.location === action.selection.location
         ? { ...state, selection: action.selection }
+        : state;
+    case "OPEN_BORROW":
+      return state.mode === "info" && state.selection?.location === "table"
+        ? { mode: "borrow", selection: null, pendingLockFrom: null }
+        : state;
+    case "CLOSE_BORROW":
+      return state.mode === "borrow"
+        ? { mode: "resume", selection: null, pendingLockFrom: null }
         : state;
   }
 }
@@ -149,6 +160,7 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
   const [webgl, setWebgl] = useState(true);
   const closeRef = useRef<HTMLButtonElement>(null);
   const resumeRef = useRef<HTMLButtonElement>(null);
+  const borrowBackRef = useRef<HTMLButtonElement>(null);
   const roomStateRef = useRef(roomState);
   const controlsRef = useRef<RoomControlsHandle | null>(null);
 
@@ -277,6 +289,10 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
     if (roomState.mode === "resume") resumeRef.current?.focus();
   }, [roomState.mode]);
 
+  useEffect(() => {
+    if (roomState.mode === "borrow") borrowBackRef.current?.focus();
+  }, [roomState.mode]);
+
   const openBook = useCallback((selection: BookSelection) => {
     if (roomStateRef.current.mode !== "moving") return;
     dispatch({ type: "OPEN_INFO", selection });
@@ -311,6 +327,38 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
     if (!book || !location) return;
     dispatch({ type: "NAVIGATE_INFO", selection: { book, location } });
   }, [dispatch]);
+
+  const openBorrow = useCallback(() => {
+    const current = roomStateRef.current;
+    if (
+      current.mode !== "info" ||
+      current.selection?.location !== "table" ||
+      !tableSerialSet.has(current.selection.book.serialNumber) ||
+      tableBooks.length === 0
+    ) return;
+    dispatch({ type: "OPEN_BORROW" });
+  }, [dispatch, tableBooks.length, tableSerialSet]);
+
+  const closeBorrow = useCallback(() => {
+    dispatch({ type: "CLOSE_BORROW" });
+  }, [dispatch]);
+
+  if (roomState.mode === "borrow") return <main className="borrow-page">
+    <article className="borrow-card" aria-labelledby="borrow-title">
+      <p className="eyebrow">NLB MOBILE APP</p>
+      <h1 id="borrow-title">Borrow your books</h1>
+      <p className="borrow-message">To borrow these books, check out the NLB mobile app here!</p>
+      <Image
+        className="borrow-qr"
+        src="/NLBMobile_QR.png"
+        width={368}
+        height={400}
+        priority
+        alt="QR code for the NLB mobile app"
+      />
+      <button ref={borrowBackRef} className="borrow-back" type="button" onClick={closeBorrow}>← Back to book stack</button>
+    </article>
+  </main>;
 
   return <main className="library-room">
     <section className="viewport" aria-label={`${bookshelf.name}, an interactive three-dimensional library`}>
@@ -401,7 +449,10 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
               type="button"
               onClick={addSelectedBookToTable}
               disabled={tableSerialSet.has(selectedBook.serialNumber) || tableBooks.length >= TABLE_BOOK_CAPACITY}
-            >{tableBooks.length >= TABLE_BOOK_CAPACITY ? `Table full · ${TABLE_BOOK_CAPACITY}/${TABLE_BOOK_CAPACITY}` : `Add to table · ${tableBooks.length}/${TABLE_BOOK_CAPACITY}`}</button> : <button type="button" onClick={returnSelectedBookToShelf}>Return to shelf</button>}
+            >{tableBooks.length >= TABLE_BOOK_CAPACITY ? `Table full · ${TABLE_BOOK_CAPACITY}/${TABLE_BOOK_CAPACITY}` : `Add to table · ${tableBooks.length}/${TABLE_BOOK_CAPACITY}`}</button> : <>
+              <button type="button" onClick={openBorrow}>Borrow stack · {tableBooks.length} {tableBooks.length === 1 ? "book" : "books"}</button>
+              <button className="secondary" type="button" onClick={returnSelectedBookToShelf}>Return this book to shelf</button>
+            </>}
           </div>
         </div>
       </article>
