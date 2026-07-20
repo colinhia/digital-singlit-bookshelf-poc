@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import type { Book, BookSelection, Bookshelf, RoomControlsHandle } from "@/types/library";
 import { getBookAppearanceColor, resolveBookAppearance } from "@/data/bookAppearance";
@@ -69,6 +69,75 @@ const fieldLabel = (field: string) =>
   field
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/^./, (character) => character.toUpperCase());
+
+const TITLE_LINE_LIMIT = 3;
+
+function AutoFitTitle({ title }: { title: string }) {
+  const slotRef = useRef<HTMLDivElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  useLayoutEffect(() => {
+    const slot = slotRef.current;
+    const heading = headingRef.current;
+    if (!slot || !heading) return;
+
+    const fitTitle = () => {
+      const slotStyle = getComputedStyle(slot);
+      const maximumSize = Number.parseFloat(slotStyle.getPropertyValue("--detail-title-max-size"));
+      const minimumSize = Number.parseFloat(slotStyle.getPropertyValue("--detail-title-min-size"));
+      if (!Number.isFinite(maximumSize) || !Number.isFinite(minimumSize)) return;
+
+      const setSize = (size: number) => { heading.style.fontSize = `${size}px`; };
+      const fits = () => {
+        const lineHeight = Number.parseFloat(getComputedStyle(heading).lineHeight);
+        return heading.scrollHeight <= lineHeight * TITLE_LINE_LIMIT + 1;
+      };
+
+      setSize(maximumSize);
+      if (fits()) return;
+
+      setSize(minimumSize);
+      if (!fits()) return;
+
+      let lower = minimumSize;
+      let upper = maximumSize;
+      let best = minimumSize;
+      while (upper - lower > 0.5) {
+        const candidate = (lower + upper) / 2;
+        setSize(candidate);
+        if (fits()) {
+          best = candidate;
+          lower = candidate;
+        } else {
+          upper = candidate;
+        }
+      }
+      setSize(best);
+    };
+
+    fitTitle();
+    if (typeof ResizeObserver === "undefined") return;
+
+    let frame = 0;
+    let previousWidth = slot.clientWidth;
+    const observer = new ResizeObserver(([entry]) => {
+      const width = entry.contentRect.width;
+      if (Math.abs(width - previousWidth) < 0.5) return;
+      previousWidth = width;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(fitTitle);
+    });
+    observer.observe(slot);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [title]);
+
+  return <div ref={slotRef} className="detail-title-slot">
+    <h2 ref={headingRef} id="book-dialog-title">{title}</h2>
+  </div>;
+}
 
 export default function Library({ books, bookshelf }: { books: Book[]; bookshelf: Bookshelf }) {
   const [query, setQuery] = useState("");
@@ -318,7 +387,7 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
             <button type="button" onClick={() => navigateInfo(nextBook)} disabled={!nextBook} aria-label="Next book">Next →</button>
           </div>
           <p className="eyebrow">{selection.location === "table" ? "ON TABLE" : "ON SHELF"} · VOLUME {String(selectedBook.serialNumber).padStart(3,"0")}</p>
-          <h2 id="book-dialog-title">{selectedBook.title}</h2>
+          <AutoFitTitle title={selectedBook.title} />
           <p className="author">by {selectedBook.author}</p>
           <dl>
             <div><dt>Language</dt><dd>{selectedBook.language}</dd></div>

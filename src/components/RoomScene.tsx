@@ -2,7 +2,7 @@
 
 import { PointerLockControls, Text } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import type { PointerLockControls as PointerLockControlsImpl } from "three-stdlib";
 import type { Book, BookSelection, RoomControlsHandle, WallId } from "@/types/library";
@@ -35,23 +35,6 @@ function Bookcase({ wall }: { wall: WallId }) {
   </group>;
 }
 
-function Vines() {
-  const pieces = useMemo(() => Array.from({ length: 72 }, (_, index) => {
-    const wall = index % 3;
-    const t = ((index * 37) % 100) / 100;
-    const y = EAVE_HEIGHT + 0.18 - ((index * 13) % 18) / 100;
-    const vineFace = ROOM_HALF - 0.08;
-    const vineSpan = ROOM_HALF * 1.84;
-    if (wall === 0) return { position: [-vineFace, y, -vineSpan / 2 + t * vineSpan] as [number,number,number], rotation: [0, 0, Math.PI / 2] as [number,number,number] };
-    if (wall === 1) return { position: [-vineSpan / 2 + t * vineSpan, y, -vineFace] as [number,number,number], rotation: [0, 0, 0] as [number,number,number] };
-    return { position: [vineFace, y, -vineSpan / 2 + t * vineSpan] as [number,number,number], rotation: [0, 0, Math.PI / 2] as [number,number,number] };
-  }), []);
-  return <group>{pieces.map((piece, index) => <group key={index} position={piece.position} rotation={piece.rotation}>
-    <mesh scale={[0.13,0.24,0.06]}><sphereGeometry args={[1,8,6]} /><meshStandardMaterial color={index % 4 ? "#315234" : "#203d2b"} roughness={1} /></mesh>
-    {index % 3 === 0 && <mesh position={[0.08,0.03,0.05]} scale={0.07}><sphereGeometry args={[1,8,6]} /><meshStandardMaterial color={index % 2 ? "#a95147" : "#d86f78"} /></mesh>}
-  </group>)}</group>;
-}
-
 function RoomArchitecture() {
   return <>
     <color attach="background" args={["#e8d9c5"]} />
@@ -66,7 +49,6 @@ function RoomArchitecture() {
     <mesh position={[0,2.45,ROOM_HALF-0.4]}><boxGeometry args={[1.72,4.22,0.15]} /><meshStandardMaterial color="#b36d46" roughness={0.86} /></mesh>
     <Text position={[0,2.5,ROOM_HALF-0.52]} rotation={[0,Math.PI,0]} fontSize={0.18} color="#f4e7d0" letterSpacing={0.2}>THE DOOR</Text>
     <Bookcase wall="left" /><Bookcase wall="rear" /><Bookcase wall="right" />
-    <Vines />
   </>;
 }
 
