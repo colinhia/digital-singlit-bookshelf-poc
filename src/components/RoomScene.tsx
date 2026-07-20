@@ -18,6 +18,8 @@ const SHELF_WIDTH = 6.9;
 const BOOK_FACE = ROOM_HALF - 0.36;
 const BOOKCASE_FACE = ROOM_HALF - 0.18;
 const CAMERA_HEIGHT = 3.53;
+const MOBILE_MIN_PITCH = -0.72;
+const MOBILE_MAX_PITCH = 1.05;
 const SLOTS_PER_TIER = roomLayout.walls[0].slotsPerTier;
 const TIER_COUNT = roomLayout.walls[0].tiers;
 const TIER_Y = Array.from({ length: TIER_COUNT }, (_, index) => 0.48 + index * 0.92);
@@ -83,7 +85,11 @@ function CameraRig({ mobile, onSelect, target, onControlsReady, onLock, onUnlock
       const dy = event.clientY - drag.current.y;
       if (Math.abs(dx) + Math.abs(dy) > 4) drag.current.moved = true;
       camera.rotation.y -= dx * 0.004;
-      camera.rotation.x = THREE.MathUtils.clamp(camera.rotation.x - dy * 0.003, -0.72, 0.72);
+      camera.rotation.x = THREE.MathUtils.clamp(
+        camera.rotation.x - dy * 0.003,
+        MOBILE_MIN_PITCH,
+        MOBILE_MAX_PITCH,
+      );
       drag.current.x = event.clientX; drag.current.y = event.clientY;
     };
     const up = () => { if (!drag.current.moved && target) onSelect(target); drag.current.active = false; };
