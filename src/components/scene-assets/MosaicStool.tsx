@@ -7,7 +7,7 @@ import { createTileTexture } from "@/components/scene-assets/mosaicTexture";
 const STOOL_RADIUS = 0.312;
 const STOOL_HEIGHT = 0.696;
 
-export function MosaicStool() {
+export function MosaicStool({ position = STOOL_POSITION }: { position?: [number, number, number] }) {
   const sideTexture = useMemo(() => createTileTexture({ columns: 16, rows: 6 }), []);
   const topTexture = useMemo(() => createTileTexture({ columns: 6, rows: 6 }), []);
 
@@ -16,7 +16,7 @@ export function MosaicStool() {
     topTexture.dispose();
   }, [sideTexture, topTexture]);
 
-  return <group position={STOOL_POSITION}>
+  return <group position={position}>
     <mesh position={[0, STOOL_HEIGHT / 2, 0]} castShadow receiveShadow>
       <cylinderGeometry args={[STOOL_RADIUS, STOOL_RADIUS, STOOL_HEIGHT, 48, 1, true]} />
       <meshStandardMaterial map={sideTexture} roughness={0.88} metalness={0.01} />

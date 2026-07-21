@@ -78,8 +78,32 @@ kbd { border:1px solid #f6f5f366; padding:2px 5px; font:8px "Courier New",monosp
 .detail-actions { display:grid; gap:10px; margin-top:26px; }
 .detail-actions button { width:100%; border:1px solid var(--brick); background:var(--brick); color:var(--cream); padding:12px 16px; font-size:10px; letter-spacing:.12em; text-transform:uppercase; cursor:pointer; }
 .detail-actions button.secondary { background:transparent; color:var(--brick); }
+.detail-actions button.danger { border-color:#7c2d2d; color:#7c2d2d; }
 .detail-actions button:disabled { border-color:#8a817a70; background:#8a817a35; color:#655f5b99; cursor:default; }
 dl { margin-top:38px; border-top:1px solid #d5d1cd; } dl div { display:grid; grid-template-columns:1fr 1.4fr; padding:12px 0; border-bottom:1px solid #dedbd7; font-size:10px; } dt { color:#78716d; } dd { margin:0; }
+.my-library-hud h2 { margin:0 0 12px; font:500 42px/1 Georgia,serif; }
+.library-summary { margin:20px 0 0; }
+.role-backdrop { z-index:30; }
+.role-card { width:min(720px,calc(100vw - 40px)); padding:clamp(30px,5vw,52px); background:var(--cream); border-top:7px solid var(--brick); box-shadow:12px 12px 0 var(--peach); }
+.role-card h1 { max-width:580px; margin:0; font:500 clamp(40px,7vw,64px)/.95 Georgia,serif; }
+.role-card>p:not(.eyebrow) { color:#655f5b; font:18px/1.45 Georgia,serif; }
+.role-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin:28px 0 24px; }
+.role-options button { display:grid; gap:10px; min-height:150px; padding:22px; text-align:left; border:1px solid #a9514760; background:var(--paper); cursor:pointer; }
+.role-options button:hover,.role-options button:focus-visible { outline:2px solid var(--brick); outline-offset:2px; background:#fffdf8; }
+.role-options strong { font:500 27px/1.05 Georgia,serif; }.role-options span { color:#655f5b; font-size:9px; line-height:1.55; }
+.role-home-link { color:var(--brick); font-size:9px; letter-spacing:.08em; text-transform:uppercase; text-underline-offset:3px; }
+.catalogue-panel { position:relative; width:min(760px,calc(100vw - 40px)); max-height:86dvh; overflow:auto; padding:38px; background:var(--cream); box-shadow:12px 12px 0 var(--peach); }
+.catalogue-panel h2 { margin:0; font:500 clamp(34px,6vw,52px)/1 Georgia,serif; }
+.catalogue-introduction { max-width:610px; color:#655f5b; font:17px/1.4 Georgia,serif; }
+.catalogue-search { display:grid; gap:7px; margin-top:24px; }.catalogue-search>span { color:#716963; font-size:8px; letter-spacing:.14em; text-transform:uppercase; }
+.catalogue-search>div { display:flex; align-items:center; height:48px; border:1px solid #cfc8c2; background:white; }.catalogue-search>div>span { padding-left:14px; font:25px serif; transform:rotate(-20deg); }
+.catalogue-search input { width:100%; min-width:0; border:0; outline:0; padding:0 12px; background:transparent; font-size:11px; }.catalogue-search button { border:0; background:transparent; padding:8px 14px; font-size:20px; cursor:pointer; }
+.catalogue-status { display:flex; justify-content:space-between; gap:20px; margin:15px 0; color:#716963; font-size:9px; }.catalogue-notice { margin:12px 0; padding:10px 12px; border-left:4px solid #2f4a3a; background:#e1e8df; color:#2f4a3a; font-size:9px; }
+.catalogue-results { display:grid; gap:8px; margin:0; padding:0; list-style:none; }.catalogue-results li { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:18px; padding:14px; border:1px solid #d5d1cd; background:var(--paper); }
+.catalogue-results li>div { display:grid; min-width:0; }.catalogue-results li span { margin-bottom:5px; color:var(--brick); font-size:7px; letter-spacing:.1em; text-transform:uppercase; }.catalogue-results li strong { overflow-wrap:anywhere; font:500 19px/1.1 Georgia,serif; }.catalogue-results li small { margin-top:5px; overflow-wrap:anywhere; color:#655f5b; font-size:8px; }
+.catalogue-results li button,.catalogue-more { border:1px solid var(--brick); background:var(--brick); color:var(--cream); padding:10px 12px; font-size:8px; letter-spacing:.08em; text-transform:uppercase; cursor:pointer; }.catalogue-results li button:disabled { border-color:#8a817a55; background:#8a817a25; color:#655f5b88; cursor:default; }
+.catalogue-more { display:block; margin:18px auto 0; }.catalogue-empty { padding:24px; text-align:center; color:#655f5b; font:18px Georgia,serif; }
+.read-only-note { margin-top:24px; padding:12px; border-left:4px solid var(--brick); background:#eadfce; font-size:9px; letter-spacing:.08em; text-transform:uppercase; }
 .sr-collection { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 @media(max-width:700px){
   .shell-page { padding:24px 16px; }.shell-panel { padding:32px 22px; box-shadow:9px 9px 0 #55331fd1; }.shell-panel h1 { font-size:clamp(42px,14vw,62px); }.shell-introduction { margin:16px 0 24px; }.shell-options { grid-template-columns:1fr; }.shell-option { min-height:158px; padding:20px; }.shell-option-number { margin-bottom:18px; }.shell-option strong { font-size:25px; }
@@ -91,6 +115,7 @@ dl { margin-top:38px; border-top:1px solid #d5d1cd; } dl div { display:grid; gri
   .borrow-page { padding:20px 16px; }.borrow-card { padding:30px 20px; box-shadow:8px 8px 0 var(--peach); }.borrow-message { font-size:18px; }
   .target-card strong { font-size:15px; }.enter-room { bottom:64px; }.enter-room span { font-size:20px; }
   .detail { width:calc(100vw - 40px); max-height:86dvh; grid-template-columns:minmax(0,1fr); gap:24px; padding:42px 22px 24px; }.detail-cover { width:min(230px,100%); }.detail-title-slot { --detail-title-max-size:36px; --detail-title-min-size:26px; min-height:103px; }.detail-cover strong { font-size:32px; }
+  .role-card { padding:30px 22px; box-shadow:8px 8px 0 var(--peach); }.role-options { grid-template-columns:1fr; }.role-options button { min-height:116px; }.catalogue-panel { padding:38px 22px 24px; }.catalogue-status { align-items:flex-start; flex-direction:column; gap:5px; }.catalogue-results li { grid-template-columns:1fr; }.catalogue-results li button { width:100%; }
 }
 @media(prefers-reduced-motion:reduce){
   .shell-option,.hud-panel,.target-card { transition:none; }

@@ -1,0 +1,22 @@
+import type { Book } from "@/types/library";
+
+export type MyLibraryRole = "owner" | "visitor";
+export type MyLibraryLocation = "reading-list" | "currently-reading" | "completed";
+
+export interface MyLibrarySelection {
+  book: Book;
+  location: MyLibraryLocation;
+}
+
+export type MyLibraryTarget =
+  | { kind: "book"; selection: MyLibrarySelection }
+  | { kind: "reading-shelf" };
+
+export interface CuratedLibraryState {
+  readingListSerials: number[];
+  currentlyReadingSerial: number | null;
+  completedSerials: number[];
+}
+
+export type MyLibraryMode = "role" | "pause" | "resume" | "moving" | "catalogue" | "info";
+
