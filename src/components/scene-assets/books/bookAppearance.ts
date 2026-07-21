@@ -1,4 +1,5 @@
-import type { Book, BookAppearance } from "@/types/library";
+import type { BookAppearance } from "@/types/library";
+import type { BookVisualData } from "@/components/scene-assets/books/types";
 
 export const BOOK_PALETTE = [
   { backgroundColor: "#4a2c24", textColor: "#d8cfbf" },
@@ -14,7 +15,7 @@ function hashSerialNumber(serialNumber: number) {
   return (value ^ (value >>> 16)) >>> 0;
 }
 
-export function resolveBookAppearance(book: Pick<Book, "serialNumber">): BookAppearance {
+export function resolveBookAppearance(book: Pick<BookVisualData, "serialNumber">): BookAppearance {
   const paletteEntry = BOOK_PALETTE[hashSerialNumber(book.serialNumber) % BOOK_PALETTE.length];
   return { kind: "solid", ...paletteEntry };
 }
