@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Image from "next/image";
+import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import type { Book, BookSelection, Bookshelf, RoomControlsHandle } from "@/types/library";
@@ -393,7 +394,10 @@ export default function Library({ books, bookshelf }: { books: Book[]; bookshelf
             </div>
           </label>
         </div>
-        <p className="result-count"><strong>{filtered.length}</strong> matching {filtered.length === 1 ? "volume" : "volumes"}</p>
+        <div className="hud-footer">
+          <p className="result-count"><strong>{filtered.length}</strong> matching {filtered.length === 1 ? "volume" : "volumes"}</p>
+          {roomState.mode === "filters" && <Link className="hud-home-link" href="/">← Back to home</Link>}
+        </div>
       </div>
 
       {roomState.mode === "moving" && <div className="crosshair" aria-hidden="true"><span /><span /></div>}
