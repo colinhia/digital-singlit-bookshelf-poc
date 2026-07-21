@@ -8,7 +8,7 @@ import type { PointerLockControls as PointerLockControlsImpl } from "three-stdli
 import type { Book, BookSelection, RoomControlsHandle } from "@/types/library";
 import { roomLayout } from "@/data/room";
 import { Bookcase } from "@/components/scene-assets/Bookcase";
-import RoomSurfaces from "@/components/scene-assets/RoomSurfaces";
+import { RoomEnvironment } from "@/components/scene-assets/RoomEnvironment";
 import BookCollection from "@/components/BookCollection";
 import RoomCentrepiece from "@/components/RoomCentrepiece";
 import { EntranceFoliage, PerimeterFoliage } from "@/components/scene-assets/EntranceFoliage";
@@ -17,7 +17,6 @@ import {
   BOOKCASE_FACE,
   BOOKCASE_WIDTH,
   BOOK_FACE,
-  EAVE_HEIGHT,
   ROOM_HALF,
   SHELF_WIDTH,
   TIER_Y,
@@ -27,23 +26,6 @@ const CAMERA_HEIGHT = 3.53;
 const MOBILE_MIN_PITCH = -0.72;
 const MOBILE_MAX_PITCH = 1.05;
 const SLOTS_PER_TIER = roomLayout.walls[0].slotsPerTier;
-
-function RoomArchitecture() {
-  return <>
-    <color attach="background" args={["#e8d9c5"]} />
-    <ambientLight intensity={1.35} color="#ffd7a6" />
-    <directionalLight position={[0, 7, 2]} intensity={2.2} color="#ffd3a0" castShadow shadow-mapSize={[1024,1024]} />
-    <pointLight position={[0, 4.6, 0]} intensity={35} distance={14} color="#f2a96f" />
-    <RoomSurfaces roomHalf={ROOM_HALF} eaveHeight={EAVE_HEIGHT} />
-    <mesh position={[0,EAVE_HEIGHT / 2,ROOM_HALF]}><boxGeometry args={[ROOM_HALF * 2,EAVE_HEIGHT,0.18]} /><meshStandardMaterial color="#eee4d4" roughness={1} /></mesh>
-    <mesh position={[0,6.9,ROOM_HALF-0.12]}><boxGeometry args={[ROOM_HALF * 2,0.32,0.14]} /><meshStandardMaterial color="#a95147" /></mesh>
-    <mesh position={[0,0.45,ROOM_HALF-0.12]}><boxGeometry args={[ROOM_HALF * 2,0.7,0.15]} /><meshStandardMaterial color="#a95147" /></mesh>
-    <VintageGate position={[0, 0, ROOM_HALF - 0.33]} />
-    <EntranceFoliage position={[0, 0, ROOM_HALF - 0.62]} />
-    <PerimeterFoliage roomHalf={ROOM_HALF} bookcaseFace={BOOKCASE_FACE} bookcaseWidth={BOOKCASE_WIDTH} tierY={TIER_Y} />
-    <Bookcase wall="left" /><Bookcase wall="rear" /><Bookcase wall="right" />
-  </>;
-}
 
 function CameraRig({ mobile, onSelect, target, onControlsReady, onLock, onUnlock }: { mobile: boolean; onSelect: (selection: BookSelection) => void; target: BookSelection | null; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
   const { camera, gl } = useThree();
@@ -90,7 +72,11 @@ function CameraRig({ mobile, onSelect, target, onControlsReady, onLock, onUnlock
 
 function Scene({ books, tableBooks, matchingSerials, mobile, onSelect, onTarget, target, onControlsReady, onLock, onUnlock }: { books: Book[]; tableBooks: Book[]; matchingSerials: Set<number>; mobile: boolean; onSelect: (selection: BookSelection) => void; onTarget: (selection: BookSelection | null) => void; target: BookSelection | null; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
   return <>
-    <RoomArchitecture />
+    <RoomEnvironment />
+    <VintageGate position={[0, 0, ROOM_HALF - 0.33]} />
+    <EntranceFoliage position={[0, 0, ROOM_HALF - 0.62]} />
+    <PerimeterFoliage roomHalf={ROOM_HALF} bookcaseFace={BOOKCASE_FACE} bookcaseWidth={BOOKCASE_WIDTH} tierY={TIER_Y} />
+    <Bookcase wall="left" /><Bookcase wall="rear" /><Bookcase wall="right" />
     <RoomCentrepiece />
     <BookCollection
       books={books}
