@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { createTileTexture } from "@/components/room-decor/mosaicTexture";
-import { TABLE_POSITION } from "@/components/room-decor/TiledDisplayTable";
+import { createTileTexture } from "@/components/scene-assets/mosaicTexture";
+import { TABLE_POSITION } from "@/components/scene-assets/TiledDisplayTable";
 
 const STOOL_RADIUS = 0.312;
 const STOOL_HEIGHT = 0.696;

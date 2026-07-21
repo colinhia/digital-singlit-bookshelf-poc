@@ -7,11 +7,11 @@ import * as THREE from "three";
 import type { PointerLockControls as PointerLockControlsImpl } from "three-stdlib";
 import type { Book, BookSelection, RoomControlsHandle, WallId } from "@/types/library";
 import { roomLayout } from "@/data/room";
-import RoomSurfaces from "@/components/RoomSurfaces";
+import RoomSurfaces from "@/components/scene-assets/RoomSurfaces";
 import BookCollection from "@/components/BookCollection";
 import RoomCentrepiece from "@/components/RoomCentrepiece";
-import { EntranceFoliage, PerimeterFoliage } from "@/components/room-decor/EntranceFoliage";
-import { VintageGate } from "@/components/room-decor/VintageGate";
+import { EntranceFoliage, PerimeterFoliage } from "@/components/scene-assets/EntranceFoliage";
+import { VintageGate } from "@/components/scene-assets/VintageGate";
 
 const ROOM_HALF = 3.84;
 const SHELF_WIDTH = 6.9;

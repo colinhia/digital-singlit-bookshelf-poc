@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { createTileTexture } from "@/components/room-decor/mosaicTexture";
+import { createTileTexture } from "@/components/scene-assets/mosaicTexture";
 
 export const TABLE_POSITION: [number, number, number] = [0, 0, -1.25];
 const TABLETOP_RADIUS = 0.73;

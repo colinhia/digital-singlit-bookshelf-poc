@@ -7,7 +7,7 @@ import { RoundedBoxGeometry } from "three-stdlib";
 import type { Book, BookRenderProfile, BookSelection, BookSlot } from "@/types/library";
 import { bookSlots } from "@/data/room";
 import { getBookAppearanceColor, resolveBookAppearance } from "@/data/bookAppearance";
-import { TABLE_POSITION, TABLETOP_SURFACE_HEIGHT } from "@/components/room-decor/TiledDisplayTable";
+import { TABLE_POSITION, TABLETOP_SURFACE_HEIGHT } from "@/components/scene-assets/TiledDisplayTable";
 
 const TITLE_CHARACTER_LIMIT = 20;
 const TITLE_ATLAS_COLUMNS = 30;

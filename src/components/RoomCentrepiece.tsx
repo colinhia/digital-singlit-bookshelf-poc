@@ -1,7 +1,7 @@
 "use client";
 
-import { MosaicStool } from "@/components/room-decor/MosaicStool";
-import { TiledDisplayTable } from "@/components/room-decor/TiledDisplayTable";
+import { MosaicStool } from "@/components/scene-assets/MosaicStool";
+import { TiledDisplayTable } from "@/components/scene-assets/TiledDisplayTable";
 
 export default function RoomCentrepiece() {
   return <>
