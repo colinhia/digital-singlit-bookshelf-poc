@@ -9,8 +9,8 @@ import type { Book, BookSelection, RoomControlsHandle } from "@/types/library";
 import { roomLayout } from "@/data/room";
 import { Bookcase } from "@/components/scene-assets/Bookcase";
 import { RoomEnvironment } from "@/components/scene-assets/RoomEnvironment";
-import BookCollection from "@/components/BookCollection";
-import RoomCentrepiece from "@/components/RoomCentrepiece";
+import BookCollection from "@/experiences/singlit/BookCollection";
+import RoomCentrepiece from "@/components/scene-assets/RoomCentrepiece";
 import { EntranceFoliage, PerimeterFoliage } from "@/components/scene-assets/EntranceFoliage";
 import { VintageGate } from "@/components/scene-assets/VintageGate";
 import {

@@ -1,5 +1,5 @@
 export const ROOM_HALF = 3.84;
-export const SHELF_WIDTH = 6.9;
+export const SHELF_WIDTH = 6.6;
 export const BOOK_FACE = ROOM_HALF - 0.36;
 export const BOOKCASE_FACE = ROOM_HALF - 0.18;
 export const BOOKCASE_HEIGHT = 7.72;

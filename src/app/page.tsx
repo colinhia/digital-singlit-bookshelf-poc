@@ -1,6 +1,6 @@
 import { getBooks } from "@/data/books";
 import { mainBookshelf } from "@/data/bookshelves";
-import Library from "@/components/Library";
+import Library from "@/experiences/singlit/Library";
 
 export const dynamic = "force-dynamic";
 
