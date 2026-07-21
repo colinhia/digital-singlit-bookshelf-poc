@@ -5,39 +5,28 @@ import { Canvas, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import type { PointerLockControls as PointerLockControlsImpl } from "three-stdlib";
-import type { Book, BookSelection, RoomControlsHandle, WallId } from "@/types/library";
+import type { Book, BookSelection, RoomControlsHandle } from "@/types/library";
 import { roomLayout } from "@/data/room";
+import { Bookcase } from "@/components/scene-assets/Bookcase";
 import RoomSurfaces from "@/components/scene-assets/RoomSurfaces";
 import BookCollection from "@/components/BookCollection";
 import RoomCentrepiece from "@/components/RoomCentrepiece";
 import { EntranceFoliage, PerimeterFoliage } from "@/components/scene-assets/EntranceFoliage";
 import { VintageGate } from "@/components/scene-assets/VintageGate";
+import {
+  BOOKCASE_FACE,
+  BOOKCASE_WIDTH,
+  BOOK_FACE,
+  EAVE_HEIGHT,
+  ROOM_HALF,
+  SHELF_WIDTH,
+  TIER_Y,
+} from "@/components/scene-assets/roomLayout";
 
-const ROOM_HALF = 3.84;
-const SHELF_WIDTH = 6.9;
-const BOOK_FACE = ROOM_HALF - 0.36;
-const BOOKCASE_FACE = ROOM_HALF - 0.18;
 const CAMERA_HEIGHT = 3.53;
 const MOBILE_MIN_PITCH = -0.72;
 const MOBILE_MAX_PITCH = 1.05;
 const SLOTS_PER_TIER = roomLayout.walls[0].slotsPerTier;
-const TIER_COUNT = roomLayout.walls[0].tiers;
-const TIER_Y = Array.from({ length: TIER_COUNT }, (_, index) => 0.48 + index * 0.92);
-const BOOKCASE_HEIGHT = 7.72;
-const BOOKCASE_WIDTH = 7.34;
-const EAVE_HEIGHT = 8.02;
-function Bookcase({ wall }: { wall: WallId }) {
-  const isRear = wall === "rear";
-  const x = wall === "left" ? -BOOKCASE_FACE : wall === "right" ? BOOKCASE_FACE : 0;
-  const z = isRear ? -BOOKCASE_FACE : 0;
-  const rotation = wall === "left" ? Math.PI / 2 : wall === "right" ? -Math.PI / 2 : 0;
-  return <group position={[x, 0, z]} rotation={[0, rotation, 0]}>
-    <mesh position={[0, BOOKCASE_HEIGHT / 2, -0.13]} receiveShadow><boxGeometry args={[BOOKCASE_WIDTH, BOOKCASE_HEIGHT, 0.22]} /><meshStandardMaterial color="#4b2d1d" roughness={0.9} /></mesh>
-    {TIER_Y.map((y) => <mesh key={y} position={[0, y, 0.12]} receiveShadow castShadow><boxGeometry args={[BOOKCASE_WIDTH + 0.05, 0.12, 0.6]} /><meshStandardMaterial color="#8a5835" roughness={0.72} /></mesh>)}
-    <mesh position={[-BOOKCASE_WIDTH / 2, BOOKCASE_HEIGHT / 2, 0]}><boxGeometry args={[0.18, BOOKCASE_HEIGHT + 0.1, 0.68]} /><meshStandardMaterial color="#74452b" /></mesh>
-    <mesh position={[BOOKCASE_WIDTH / 2, BOOKCASE_HEIGHT / 2, 0]}><boxGeometry args={[0.18, BOOKCASE_HEIGHT + 0.1, 0.68]} /><meshStandardMaterial color="#74452b" /></mesh>
-  </group>;
-}
 
 function RoomArchitecture() {
   return <>
