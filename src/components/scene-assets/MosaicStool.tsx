@@ -1,16 +1,11 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import { STOOL_POSITION } from "@/components/scene-assets/furnitureLayout";
 import { createTileTexture } from "@/components/scene-assets/mosaicTexture";
-import { TABLE_POSITION } from "@/components/scene-assets/TiledDisplayTable";
 
 const STOOL_RADIUS = 0.312;
 const STOOL_HEIGHT = 0.696;
-const STOOL_POSITION: [number, number, number] = [
-  TABLE_POSITION[0] + 0.86,
-  0,
-  TABLE_POSITION[2] + 0.65,
-];
 
 export function MosaicStool() {
   const sideTexture = useMemo(() => createTileTexture({ columns: 16, rows: 6 }), []);

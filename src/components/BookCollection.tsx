@@ -7,7 +7,7 @@ import { RoundedBoxGeometry } from "three-stdlib";
 import type { Book, BookRenderProfile, BookSelection, BookSlot } from "@/types/library";
 import { bookSlots } from "@/data/room";
 import { getBookAppearanceColor, resolveBookAppearance } from "@/data/bookAppearance";
-import { TABLE_POSITION, TABLETOP_SURFACE_HEIGHT } from "@/components/scene-assets/TiledDisplayTable";
+import { TABLE_BOOK_STACK_POSITION } from "@/components/scene-assets/furnitureLayout";
 
 const TITLE_CHARACTER_LIMIT = 20;
 const TITLE_ATLAS_COLUMNS = 30;
@@ -385,7 +385,7 @@ function TableBookStack({ books, target, groupRef, geometries }: {
 
   return <group
     ref={groupRef}
-    position={[TABLE_POSITION[0], TABLE_POSITION[1] + TABLETOP_SURFACE_HEIGHT, TABLE_POSITION[2]]}
+    position={TABLE_BOOK_STACK_POSITION}
   >
     {entries.map(({ book, profile, centreY }, index) => {
       const highlighted = target?.location === "table" && target.book.serialNumber === book.serialNumber;
