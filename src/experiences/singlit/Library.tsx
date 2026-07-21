@@ -5,10 +5,10 @@ import Image from "next/image";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import type { Book, BookSelection, Bookshelf, RoomControlsHandle } from "@/types/library";
-import { getBookAppearanceColor, resolveBookAppearance } from "@/data/bookAppearance";
+import { getBookAppearanceColor, resolveBookAppearance } from "@/components/scene-assets/books/bookAppearance";
 import { resolveAdjacentBooks, resolveShelfBooks, resolveTableBooks, TABLE_BOOK_CAPACITY } from "@/data/bookPlacement";
 
-const RoomScene = dynamic(() => import("@/components/RoomScene"), { ssr:false, loading:() => <div className="room-loading">Preparing the room…</div> });
+const RoomScene = dynamic(() => import("@/experiences/singlit/RoomScene"), { ssr:false, loading:() => <div className="room-loading">Preparing the room…</div> });
 
 type BookField = keyof Book;
 type RoomMode = "filters" | "resume" | "moving" | "info" | "borrow";
