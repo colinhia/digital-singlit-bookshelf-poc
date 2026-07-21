@@ -515,12 +515,10 @@ function RealisticBooks({ items, tableBooks, matchingSerials, config, onSelect, 
       const boardX = profile.width / 2 - profile.coverThickness / 2;
       const leftBoardMatrix = layerMatrix(item, config, boardDimensions, [-boardX, 0, 0]);
       const rightBoardMatrix = layerMatrix(item, config, boardDimensions, [boardX, 0, 0]);
-      const hardcoverMatch = matches && profile.binding === "hardcover";
-      const hardcoverFiltered = !matches && profile.binding === "hardcover";
-      matchingBoards.setMatrixAt(index * 2, hardcoverMatch ? leftBoardMatrix : hiddenMatrix);
-      matchingBoards.setMatrixAt(index * 2 + 1, hardcoverMatch ? rightBoardMatrix : hiddenMatrix);
-      filteredBoards.setMatrixAt(index * 2, hardcoverFiltered ? leftBoardMatrix : hiddenMatrix);
-      filteredBoards.setMatrixAt(index * 2 + 1, hardcoverFiltered ? rightBoardMatrix : hiddenMatrix);
+      matchingBoards.setMatrixAt(index * 2, matches ? leftBoardMatrix : hiddenMatrix);
+      matchingBoards.setMatrixAt(index * 2 + 1, matches ? rightBoardMatrix : hiddenMatrix);
+      filteredBoards.setMatrixAt(index * 2, matches ? hiddenMatrix : leftBoardMatrix);
+      filteredBoards.setMatrixAt(index * 2 + 1, matches ? hiddenMatrix : rightBoardMatrix);
       [matchingBoards, filteredBoards].forEach((boards) => {
         boards.setColorAt(index * 2, coverColor);
         boards.setColorAt(index * 2 + 1, coverColor);
