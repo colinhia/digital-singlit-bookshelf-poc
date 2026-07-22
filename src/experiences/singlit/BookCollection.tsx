@@ -28,6 +28,7 @@ import {
   useSpineFontFamilies,
 } from "@/components/scene-assets/books/spineTypography";
 import type { BookVisualData } from "@/components/scene-assets/books/types";
+import { resolveTopDownTierY } from "@/components/scene-assets/roomLayout";
 
 interface BookRenderConfig {
   shelfWidth: number;
@@ -61,7 +62,7 @@ function baseMatrix(item: ProfiledBook, config: BookRenderConfig) {
   const { slot, profile } = item;
   const step = config.shelfWidth / config.slotsPerTier;
   const along = -config.shelfWidth / 2 + step / 2 + slot.positionOnTier * step;
-  const shelfY = config.tierY[slot.tier];
+  const shelfY = resolveTopDownTierY(config.tierY, slot.tier);
   const position = slot.wall === "rear"
     ? new THREE.Vector3(along, shelfY, -config.bookFace)
     : slot.wall === "left"

@@ -8,7 +8,7 @@ const TABLETOP_RADIUS = 0.73;
 const TABLETOP_HEIGHT = 1.78;
 const TABLETOP_THICKNESS = 0.16;
 
-export function TiledDisplayTable() {
+export function TiledDisplayTable({ position = TABLE_POSITION }: { position?: [number, number, number] }) {
   const tabletopTexture = useMemo(() => createTileTexture({ columns: 8, rows: 8, brickCentre: true }), []);
   const pedestalTexture = useMemo(() => createTileTexture({ columns: 10, rows: 9 }), []);
 
@@ -17,7 +17,7 @@ export function TiledDisplayTable() {
     pedestalTexture.dispose();
   }, [pedestalTexture, tabletopTexture]);
 
-  return <group position={TABLE_POSITION}>
+  return <group position={position}>
     <mesh position={[0, 0.07, 0]} castShadow receiveShadow>
       <cylinderGeometry args={[0.39, 0.39, 0.14, 48]} />
       <meshStandardMaterial color="#dfd3c4" roughness={0.9} />

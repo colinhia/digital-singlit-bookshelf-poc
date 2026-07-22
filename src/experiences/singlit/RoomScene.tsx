@@ -8,7 +8,7 @@ import type { PointerLockControls as PointerLockControlsImpl } from "three-stdli
 import type { Book, BookSelection, RoomControlsHandle } from "@/types/library";
 import { roomLayout } from "@/data/room";
 import { Bookcase } from "@/components/scene-assets/Bookcase";
-import { RoomEnvironment } from "@/components/scene-assets/RoomEnvironment";
+import { ROOM_WALL_COLOR, RoomEnvironment } from "@/components/scene-assets/RoomEnvironment";
 import BookCollection from "@/experiences/singlit/BookCollection";
 import RoomCentrepiece from "@/components/scene-assets/RoomCentrepiece";
 import { EntranceFoliage, PerimeterFoliage } from "@/components/scene-assets/EntranceFoliage";
@@ -97,7 +97,7 @@ function Scene({ books, tableBooks, matchingSerials, mobile, onSelect, onTarget,
 
 export default function RoomScene({ books, tableBooks, matchingSerials, onSelect, onTarget, target, mobile, onControlsReady, onLock, onUnlock }: { books: Book[]; tableBooks: Book[]; matchingSerials: Set<number>; onSelect: (selection: BookSelection) => void; onTarget: (selection: BookSelection | null) => void; target: BookSelection | null; mobile: boolean; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
   const handleCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
-    gl.setClearColor("#e8d9c5");
+    gl.setClearColor(ROOM_WALL_COLOR);
     gl.shadowMap.enabled = !mobile;
     gl.shadowMap.type = THREE.PCFSoftShadowMap;
   }, [mobile]);

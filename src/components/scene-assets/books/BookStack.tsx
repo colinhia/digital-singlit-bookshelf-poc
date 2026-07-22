@@ -60,12 +60,13 @@ export function BookVolume({ book, profile, geometries, highlighted = false, use
   </>;
 }
 
-export function BookStack({ books, highlightedSerialNumber, groupRef, geometries, bookUserData }: {
+export function BookStack({ books, highlightedSerialNumber, groupRef, geometries, bookUserData, position }: {
   books: BookVisualData[];
   highlightedSerialNumber?: number;
   groupRef?: RefObject<THREE.Group>;
   geometries: BookGeometrySet;
   bookUserData?: (book: BookVisualData, index: number) => Record<string, unknown>;
+  position?: [number, number, number];
 }) {
   const entries = useMemo(() => {
     let stackHeight = 0;
@@ -77,7 +78,7 @@ export function BookStack({ books, highlightedSerialNumber, groupRef, geometries
     });
   }, [books]);
 
-  return <group ref={groupRef} position={TABLE_BOOK_STACK_POSITION}>
+  return <group ref={groupRef} position={position ?? TABLE_BOOK_STACK_POSITION}>
     {entries.map(({ book, profile, centreY }, index) => <group
       key={book.serialNumber}
       position={[0, centreY, 0]}

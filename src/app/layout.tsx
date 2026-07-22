@@ -26,8 +26,8 @@ const notoSansTamil = Noto_Sans_Tamil({
 });
 
 export const metadata: Metadata = {
-  title: "The SingLit Room",
-  description: "Step inside a digital library of Singapore literature.",
+  title: "Digital SingLit Bookshelf PoC",
+  description: "Enter digital spaces for discovering and curating Singapore literature.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
