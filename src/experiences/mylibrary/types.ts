@@ -10,7 +10,9 @@ export interface MyLibrarySelection {
 
 export type MyLibraryTarget =
   | { kind: "book"; selection: MyLibrarySelection }
-  | { kind: "reading-shelf" };
+  | { kind: "reading-shelf" }
+  | { kind: "picture-frame" }
+  | { kind: "flower-trough"; side: "left" | "right" };
 
 export interface CuratedLibraryState {
   readingListSerials: number[];
@@ -18,5 +20,4 @@ export interface CuratedLibraryState {
   completedSerials: number[];
 }
 
-export type MyLibraryMode = "role" | "pause" | "resume" | "moving" | "catalogue" | "info";
-
+export type MyLibraryMode = "role" | "pause" | "resume" | "moving" | "catalogue" | "info" | "photo-picker" | "flower-picker";

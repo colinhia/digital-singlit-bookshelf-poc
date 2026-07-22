@@ -30,4 +30,11 @@ export const MY_LIBRARY_TABLE_BOOK_POSITION: [number, number, number] = [
 ];
 
 export const MY_LIBRARY_BOOKCASE_HEIGHT = BOOKCASE_HEIGHT;
-
+export const MY_LIBRARY_PICTURE_FRAME_POSITION: [number, number, number] = [-3.7, 4.58, 0.72];
+export const MY_LIBRARY_FLOWER_TROUGH_POSITIONS: readonly [
+  [number, number, number],
+  [number, number, number],
+] = [
+  [-3.36, 0, -1.82],
+  [-3.36, 0, 1.82],
+];

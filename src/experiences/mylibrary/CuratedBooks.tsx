@@ -26,6 +26,8 @@ import {
   useSpineFontFamilies,
 } from "@/components/scene-assets/books/spineTypography";
 import type { BookVisualData } from "@/components/scene-assets/books/types";
+import { WoodenPictureFrame } from "@/components/scene-assets/WoodenPictureFrame";
+import { FlowerTrough, type FlowerVariant } from "@/components/scene-assets/PlanterFlowers";
 import {
   BOOK_FACE,
   resolveTopDownTierY,
@@ -34,12 +36,15 @@ import {
 } from "@/components/scene-assets/roomLayout";
 import {
   MY_LIBRARY_TABLE_BOOK_POSITION,
+  MY_LIBRARY_PICTURE_FRAME_POSITION,
+  MY_LIBRARY_FLOWER_TROUGH_POSITIONS,
   READING_LIST_BOOKCASE_HEIGHT,
   READING_LIST_BOOKCASE_WIDTH,
   READING_LIST_SHELF_WIDTH,
   READING_LIST_SLOTS_PER_TIER,
   READING_LIST_TIER_Y,
 } from "@/experiences/mylibrary/layout";
+import type { PhotoOption } from "@/experiences/mylibrary/photoOptions";
 import type {
   MyLibraryLocation,
   MyLibrarySelection,
@@ -230,6 +235,7 @@ function BookTitles({ items }: { items: CuratedShelfItem[] }) {
 
 function sameTarget(left: MyLibraryTarget | null, right: MyLibraryTarget | null) {
   if (left?.kind !== right?.kind) return false;
+  if (left?.kind === "flower-trough" && right?.kind === "flower-trough") return left.side === right.side;
   if (left?.kind !== "book" || right?.kind !== "book") return left?.kind === right?.kind;
   return left.selection.location === right.selection.location
     && left.selection.book.serialNumber === right.selection.book.serialNumber;
@@ -243,6 +249,10 @@ export default function CuratedBooks({
   readingListBooks,
   completedBooks,
   currentlyReadingBook,
+  framePhoto,
+  frameEditable,
+  flowerVariant,
+  flowerEditable,
   target,
   onTarget,
   onActivateTarget,
@@ -250,6 +260,10 @@ export default function CuratedBooks({
   readingListBooks: Book[];
   completedBooks: Book[];
   currentlyReadingBook: Book | null;
+  framePhoto: PhotoOption | null;
+  frameEditable: boolean;
+  flowerVariant: FlowerVariant;
+  flowerEditable: boolean;
   target: MyLibraryTarget | null;
   onTarget: (target: MyLibraryTarget | null) => void;
   onActivateTarget: (target: MyLibraryTarget) => void;
@@ -263,6 +277,8 @@ export default function CuratedBooks({
   const boardsRef = useRef<THREE.InstancedMesh>(null);
   const tableRef = useRef<THREE.Group>(null);
   const readingShelfRef = useRef<THREE.Mesh>(null);
+  const pictureFrameRef = useRef<THREE.Group>(null);
+  const flowerTroughRefs = useRef<Array<THREE.Group | null>>([]);
   const targetRef = useRef<MyLibraryTarget | null>(null);
   const targetIndexRef = useRef<number | null>(null);
   const { camera } = useThree();
@@ -319,6 +335,18 @@ export default function CuratedBooks({
     onTarget(null);
   }, [currentlyReadingBook, items, onTarget]);
 
+  useEffect(() => {
+    if (frameEditable || targetRef.current?.kind !== "picture-frame") return;
+    targetRef.current = null;
+    onTarget(null);
+  }, [frameEditable, onTarget]);
+
+  useEffect(() => {
+    if (flowerEditable || targetRef.current?.kind !== "flower-trough") return;
+    targetRef.current = null;
+    onTarget(null);
+  }, [flowerEditable, onTarget]);
+
   useFrame(() => {
     const spine = spineRef.current;
     const shelfTarget = readingShelfRef.current;
@@ -326,6 +354,8 @@ export default function CuratedBooks({
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
     const targets: THREE.Object3D[] = [spine, shelfTarget];
     if (tableRef.current) targets.push(tableRef.current);
+    if (frameEditable && pictureFrameRef.current) targets.push(pictureFrameRef.current);
+    if (flowerEditable) flowerTroughRefs.current.forEach((trough) => trough && targets.push(trough));
     const hit = raycaster.intersectObjects(targets, true)[0];
     let nextIndex: number | null = null;
     let next: MyLibraryTarget | null = null;
@@ -335,7 +365,11 @@ export default function CuratedBooks({
       if (item) next = { kind: "book", selection: { book: item.book, location: item.location } };
     } else if (hit) {
       let object: THREE.Object3D | null = hit.object;
-      while (object && !object.userData.myLibraryTableBook && !object.userData.readingShelfTarget) object = object.parent;
+      while (object
+        && !object.userData.myLibraryTableBook
+        && !object.userData.readingShelfTarget
+        && !object.userData.pictureFrameTarget
+        && !object.userData.flowerTroughTarget) object = object.parent;
       if (object?.userData.myLibraryTableBook && currentlyReadingBook) {
         next = {
           kind: "book",
@@ -343,6 +377,10 @@ export default function CuratedBooks({
         };
       } else if (object?.userData.readingShelfTarget) {
         next = { kind: "reading-shelf" };
+      } else if (object?.userData.pictureFrameTarget) {
+        next = { kind: "picture-frame" };
+      } else if (object?.userData.flowerTroughTarget) {
+        next = { kind: "flower-trough", side: object.userData.flowerTroughTarget };
       }
     }
     if (sameTarget(next, targetRef.current)) return;
@@ -387,6 +425,28 @@ export default function CuratedBooks({
       bookUserData={tableBookUserData}
       position={MY_LIBRARY_TABLE_BOOK_POSITION}
     />
+    <WoodenPictureFrame
+      photo={framePhoto}
+      highlighted={target?.kind === "picture-frame"}
+      groupRef={pictureFrameRef}
+      position={MY_LIBRARY_PICTURE_FRAME_POSITION}
+      rotation={[0, Math.PI / 2, 0]}
+    />
+    {MY_LIBRARY_FLOWER_TROUGH_POSITIONS.map((position, index) => {
+      const side = index === 0 ? "left" : "right";
+      return <group
+        key={`my-library-flower-trough-${side}`}
+        ref={(group) => { flowerTroughRefs.current[index] = group; }}
+        position={position}
+        rotation={[0, -Math.PI / 2, 0]}
+        userData={{ flowerTroughTarget: side }}
+      >
+        <FlowerTrough
+          variant={flowerVariant}
+          highlighted={target?.kind === "flower-trough" && target.side === side}
+        />
+      </group>;
+    })}
     <mesh
       ref={readingShelfRef}
       position={[-BOOK_FACE - 0.1, READING_LIST_BOOKCASE_HEIGHT / 2, 0]}

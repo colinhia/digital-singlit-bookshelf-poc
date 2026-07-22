@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 import * as THREE from "three";
-
-type Point = [number, number, number];
-
-interface PartTransform {
-  position: THREE.Vector3;
-  quaternion: THREE.Quaternion;
-  scale: THREE.Vector3;
-  color: THREE.Color;
-}
+import {
+  InstancedFlatParts,
+  InstancedRoundParts,
+  StemSegment,
+  type PartTransform,
+  type Point,
+} from "@/components/scene-assets/BotanicalPrimitives";
+import { OrchidPlanter } from "@/components/scene-assets/PlanterFlowers";
 
 const BOUGAINVILLEA_PATHS: Point[][] = [
   [[-1.34, 0.22, 0], [-1.42, 1.25, 0.01], [-1.31, 2.4, -0.01], [-1.37, 3.45, 0.02], [-1.18, 4.84, 0]],
@@ -20,14 +19,6 @@ const BOUGAINVILLEA_PATHS: Point[][] = [
 
 const LEAF_COLORS = ["#31563a", "#416840", "#557846"];
 const BOUGAINVILLEA_COLORS = ["#bd4c9d", "#d663b1", "#9e438b"];
-const ORCHID_PETAL_COLORS = ["#d99ad8", "#ca86cd", "#e2a8df"];
-const ORCHID_STEMS: Point[][] = [
-  [[1.3, 0.43, -0.01], [1.28, 0.9, -0.02], [1.22, 1.38, -0.03]],
-  [[1.46, 0.43, 0], [1.43, 0.98, -0.01], [1.46, 1.55, -0.02]],
-  [[1.62, 0.43, 0.01], [1.61, 0.96, 0], [1.64, 1.5, -0.02]],
-  [[1.78, 0.43, 0], [1.82, 0.9, -0.01], [1.87, 1.4, -0.03]],
-  [[1.94, 0.43, -0.01], [1.98, 0.82, 0], [2.02, 1.27, -0.02]],
-];
 const HANGING_PATHS: Point[][] = [
   [[-0.13, 0.02, 0], [-0.16, -0.28, -0.01], [-0.1, -0.58, 0.01]],
   [[0, 0.02, 0], [0.05, -0.32, 0.01], [0.02, -0.7, -0.01]],
@@ -39,77 +30,6 @@ function samplePath(path: Point[], progress: number) {
   const index = Math.min(Math.floor(scaled), path.length - 2);
   const amount = scaled - index;
   return new THREE.Vector3(...path[index]).lerp(new THREE.Vector3(...path[index + 1]), amount);
-}
-
-function InstancedFlatParts({ transforms }: { transforms: PartTransform[] }) {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
-
-  useEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    const matrix = new THREE.Matrix4();
-    transforms.forEach((transform, index) => {
-      matrix.compose(transform.position, transform.quaternion, transform.scale);
-      mesh.setMatrixAt(index, matrix);
-      mesh.setColorAt(index, transform.color);
-    });
-    mesh.count = transforms.length;
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    mesh.computeBoundingSphere();
-  }, [transforms]);
-
-  return <instancedMesh ref={meshRef} args={[undefined, undefined, transforms.length]} castShadow>
-    <circleGeometry args={[1, 7]} />
-    <meshStandardMaterial color="#ffffff" roughness={0.94} metalness={0} side={THREE.DoubleSide} />
-  </instancedMesh>;
-}
-
-function InstancedRoundParts({ transforms }: { transforms: PartTransform[] }) {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
-
-  useEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    const matrix = new THREE.Matrix4();
-    transforms.forEach((transform, index) => {
-      matrix.compose(transform.position, transform.quaternion, transform.scale);
-      mesh.setMatrixAt(index, matrix);
-      mesh.setColorAt(index, transform.color);
-    });
-    mesh.count = transforms.length;
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    mesh.computeBoundingSphere();
-  }, [transforms]);
-
-  return <instancedMesh ref={meshRef} args={[undefined, undefined, transforms.length]} castShadow>
-    <sphereGeometry args={[1, 7, 5]} />
-    <meshStandardMaterial color="#ffffff" roughness={0.9} metalness={0} />
-  </instancedMesh>;
-}
-
-function StemSegment({ from, to, radius = 0.018, color = "#38523a" }: {
-  from: Point;
-  to: Point;
-  radius?: number;
-  color?: string;
-}) {
-  const transform = useMemo(() => {
-    const start = new THREE.Vector3(...from);
-    const end = new THREE.Vector3(...to);
-    const direction = end.clone().sub(start);
-    return {
-      position: start.clone().add(end).multiplyScalar(0.5),
-      length: direction.length(),
-      quaternion: new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize()),
-    };
-  }, [from, to]);
-
-  return <mesh position={transform.position} quaternion={transform.quaternion} castShadow>
-    <cylinderGeometry args={[radius, radius * 0.82, transform.length, 6]} />
-    <meshStandardMaterial color={color} roughness={0.98} />
-  </mesh>;
 }
 
 function BougainvilleaLeaves() {
@@ -175,80 +95,6 @@ function BougainvilleaFlowers() {
 
   return <group>
     <InstancedFlatParts transforms={bracts} />
-    <InstancedRoundParts transforms={centres} />
-  </group>;
-}
-
-function OrchidPlanter({ mirrored = false }: { mirrored?: boolean }) {
-  const { leaves, petals, lips, centres } = useMemo(() => {
-    const flowerCentres = [
-      [1.18, 1.34, -0.08], [1.3, 1.45, -0.075],
-      [1.43, 1.5, -0.085], [1.53, 1.61, -0.08],
-      [1.64, 1.52, -0.075], [1.75, 1.42, -0.08],
-      [1.86, 1.48, -0.085], [1.96, 1.32, -0.075],
-      [2.06, 1.23, -0.08],
-    ].map((point) => new THREE.Vector3(...point));
-
-    return {
-      leaves: Array.from({ length: 7 }, (_, index): PartTransform => {
-        const angle = -1.08 + index * 0.36;
-        return {
-          position: new THREE.Vector3(1.62 + Math.sin(angle) * 0.2, 0.47 + (index % 2) * 0.035, -0.04 - (index % 3) * 0.01),
-          quaternion: new THREE.Quaternion().setFromEuler(new THREE.Euler(0.08, 0, angle)),
-          scale: new THREE.Vector3(0.075, 0.3 + (index % 3) * 0.035, 1),
-          color: new THREE.Color(LEAF_COLORS[(index + 1) % LEAF_COLORS.length]),
-        };
-      }),
-      petals: flowerCentres.flatMap((centre, flowerIndex) => Array.from({ length: 5 }, (_, petalIndex): PartTransform => {
-        const angle = petalIndex * Math.PI * 2 / 5 + Math.PI / 2;
-        const isUpperPetal = petalIndex === 0;
-        return {
-          position: centre.clone().add(new THREE.Vector3(Math.cos(angle) * 0.075, Math.sin(angle) * 0.075, -0.008)),
-          quaternion: new THREE.Quaternion().setFromEuler(new THREE.Euler(0.06, 0.05 * Math.sin(flowerIndex), angle - Math.PI / 2)),
-          scale: new THREE.Vector3(isUpperPetal ? 0.082 : 0.094, isUpperPetal ? 0.143 : 0.126, 1),
-          color: new THREE.Color(ORCHID_PETAL_COLORS[(flowerIndex + petalIndex) % ORCHID_PETAL_COLORS.length]),
-        };
-      })),
-      lips: flowerCentres.map((centre, index): PartTransform => ({
-        position: centre.clone().add(new THREE.Vector3(0, -0.045, -0.022)),
-        quaternion: new THREE.Quaternion().setFromEuler(new THREE.Euler(0.04, 0, index % 2 ? 0.08 : -0.08)),
-        scale: new THREE.Vector3(0.079, 0.105, 1),
-        color: new THREE.Color(index % 2 ? "#a62d75" : "#92255f"),
-      })),
-      centres: flowerCentres.map((centre, index): PartTransform => ({
-        position: centre.clone().add(new THREE.Vector3(0, -0.005, -0.035)),
-        quaternion: new THREE.Quaternion(),
-        scale: new THREE.Vector3(0.024, 0.031, 0.015),
-        color: new THREE.Color(index % 2 ? "#efb277" : "#e7a166"),
-      })),
-    };
-  }, []);
-
-  return <group scale={mirrored ? [-1, 1, 1] : [1, 1, 1]}>
-    <group position={[1.62, 0, 0]}>
-      <mesh position={[0, 0.19, 0]} castShadow receiveShadow>
-        <boxGeometry args={[0.85, 0.38, 0.4]} />
-        <meshStandardMaterial color="#a96c51" roughness={0.94} />
-      </mesh>
-      <mesh position={[0, 0.4, 0]} castShadow>
-        <boxGeometry args={[0.93, 0.08, 0.46]} />
-        <meshStandardMaterial color="#c18768" roughness={0.92} />
-      </mesh>
-      <mesh position={[0, 0.445, -0.005]}>
-        <boxGeometry args={[0.77, 0.025, 0.32]} />
-        <meshStandardMaterial color="#49392f" roughness={1} />
-      </mesh>
-    </group>
-    {ORCHID_STEMS.flatMap((path, pathIndex) => path.slice(0, -1).map((point, index) => <StemSegment
-      key={`orchid-stem-${pathIndex}-${index}`}
-      from={point}
-      to={path[index + 1]}
-      radius={0.009}
-      color="#456b42"
-    />))}
-    <InstancedFlatParts transforms={leaves} />
-    <InstancedFlatParts transforms={petals} />
-    <InstancedFlatParts transforms={lips} />
     <InstancedRoundParts transforms={centres} />
   </group>;
 }

@@ -9,6 +9,7 @@ import type { RoomControlsHandle } from "@/types/library";
 import type { Book } from "@/types/library";
 import { Bookcase } from "@/components/scene-assets/Bookcase";
 import { MosaicStool } from "@/components/scene-assets/MosaicStool";
+import type { FlowerVariant } from "@/components/scene-assets/PlanterFlowers";
 import { ROOM_WALL_COLOR, RoomEnvironment } from "@/components/scene-assets/RoomEnvironment";
 import { TiledDisplayTable } from "@/components/scene-assets/TiledDisplayTable";
 import { VintageGate } from "@/components/scene-assets/VintageGate";
@@ -21,6 +22,7 @@ import {
   READING_LIST_TIER_Y,
 } from "@/experiences/mylibrary/layout";
 import type { MyLibraryTarget } from "@/experiences/mylibrary/types";
+import type { PhotoOption } from "@/experiences/mylibrary/photoOptions";
 import CuratedBooks from "@/experiences/mylibrary/CuratedBooks";
 
 const CAMERA_HEIGHT = 3.53;
@@ -123,6 +125,10 @@ function Scene(props: MyLibraryRoomSceneProps) {
       readingListBooks={props.readingListBooks}
       completedBooks={props.completedBooks}
       currentlyReadingBook={props.currentlyReadingBook}
+      framePhoto={props.framePhoto}
+      frameEditable={props.frameEditable}
+      flowerVariant={props.flowerVariant}
+      flowerEditable={props.flowerEditable}
       target={props.target}
       onTarget={props.onTarget}
       onActivateTarget={props.onActivateTarget}
@@ -142,6 +148,10 @@ interface MyLibraryRoomSceneProps {
   readingListBooks: Book[];
   completedBooks: Book[];
   currentlyReadingBook: Book | null;
+  framePhoto: PhotoOption | null;
+  frameEditable: boolean;
+  flowerVariant: FlowerVariant;
+  flowerEditable: boolean;
   mobile: boolean;
   target: MyLibraryTarget | null;
   onTarget: (target: MyLibraryTarget | null) => void;

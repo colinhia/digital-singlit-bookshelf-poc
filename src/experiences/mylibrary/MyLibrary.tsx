@@ -1,9 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Book, RoomControlsHandle } from "@/types/library";
+import type { FlowerVariant } from "@/components/scene-assets/PlanterFlowers";
 import { getBookAppearanceColor, resolveBookAppearance } from "@/components/scene-assets/books/bookAppearance";
 import {
   COMPLETED_CAPACITY,
@@ -16,6 +18,11 @@ import type {
   MyLibrarySelection,
   MyLibraryTarget,
 } from "@/experiences/mylibrary/types";
+import {
+  DEFAULT_VISITOR_PHOTO_ID,
+  PHOTO_OPTIONS,
+  type PhotoId,
+} from "@/experiences/mylibrary/photoOptions";
 
 const RoomScene = dynamic(() => import("@/experiences/mylibrary/RoomScene"), {
   ssr: false,
@@ -128,6 +135,8 @@ export default function MyLibrary({ books }: { books: Book[] }) {
   const [mode, setMode] = useState<MyLibraryMode>("role");
   const [selection, setSelection] = useState<MyLibrarySelection | null>(null);
   const [target, setTarget] = useState<MyLibraryTarget | null>(null);
+  const [framePhotoId, setFramePhotoId] = useState<PhotoId | null>(null);
+  const [flowerVariant, setFlowerVariant] = useState<FlowerVariant>("empty");
   const [catalogueField, setCatalogueField] = useState<CatalogueField | "">("");
   const [catalogueQuery, setCatalogueQuery] = useState("");
   const [visibleCatalogueCount, setVisibleCatalogueCount] = useState(50);
@@ -139,6 +148,8 @@ export default function MyLibrary({ books }: { books: Book[] }) {
   const ownerRoleRef = useRef<HTMLButtonElement>(null);
   const catalogueFieldRef = useRef<HTMLSelectElement>(null);
   const infoCloseRef = useRef<HTMLButtonElement>(null);
+  const photoPickerCloseRef = useRef<HTMLButtonElement>(null);
+  const flowerPickerCloseRef = useRef<HTMLButtonElement>(null);
 
   const changeMode = useCallback((next: MyLibraryMode) => {
     modeRef.current = next;
@@ -193,6 +204,7 @@ export default function MyLibrary({ books }: { books: Book[] }) {
     ? navigationBooks[selectedNavigationIndex + 1]
     : null;
   const selectedAppearance = selection ? resolveBookAppearance(selection.book) : null;
+  const framePhoto = PHOTO_OPTIONS.find((photo) => photo.id === framePhotoId) ?? null;
 
   useEffect(() => {
     const media = window.matchMedia("(pointer: coarse)");
@@ -205,12 +217,14 @@ export default function MyLibrary({ books }: { books: Book[] }) {
   }, []);
 
   useEffect(() => {
-    const overlayOpen = mode === "role" || mode === "catalogue" || mode === "info";
+    const overlayOpen = mode === "role" || mode === "catalogue" || mode === "info" || mode === "photo-picker" || mode === "flower-picker";
     if (!overlayOpen) return;
     const frame = requestAnimationFrame(() => {
       if (mode === "role") ownerRoleRef.current?.focus();
       if (mode === "catalogue") catalogueFieldRef.current?.focus();
       if (mode === "info") infoCloseRef.current?.focus();
+      if (mode === "photo-picker") photoPickerCloseRef.current?.focus();
+      if (mode === "flower-picker") flowerPickerCloseRef.current?.focus();
     });
     document.body.style.overflow = "hidden";
     return () => {
@@ -233,7 +247,7 @@ export default function MyLibrary({ books }: { books: Book[] }) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.repeat) return;
-      if (modeRef.current === "catalogue" || modeRef.current === "info") {
+      if (modeRef.current === "catalogue" || modeRef.current === "info" || modeRef.current === "photo-picker" || modeRef.current === "flower-picker") {
         event.preventDefault();
         setSelection(null);
         changeMode("resume");
@@ -246,6 +260,8 @@ export default function MyLibrary({ books }: { books: Book[] }) {
   const chooseRole = useCallback((nextRole: MyLibraryRole) => {
     setRole(nextRole);
     setLibrary(nextRole === "visitor" ? visitorLibrary(books) : EMPTY_LIBRARY);
+    setFramePhotoId(nextRole === "visitor" ? DEFAULT_VISITOR_PHOTO_ID : null);
+    setFlowerVariant(nextRole === "visitor" ? "orchid" : "empty");
     setSelection(null);
     setTarget(null);
     changeMode("pause");
@@ -276,7 +292,13 @@ export default function MyLibrary({ books }: { books: Book[] }) {
 
   const openTarget = useCallback((nextTarget: MyLibraryTarget) => {
     if (modeRef.current !== "moving") return;
-    if (nextTarget.kind === "reading-shelf") {
+    if (nextTarget.kind === "picture-frame") {
+      if (role !== "owner") return;
+      changeMode("photo-picker");
+    } else if (nextTarget.kind === "flower-trough") {
+      if (role !== "owner") return;
+      changeMode("flower-picker");
+    } else if (nextTarget.kind === "reading-shelf") {
       if (role !== "owner") return;
       setCatalogueNotice("");
       changeMode("catalogue");
@@ -366,12 +388,20 @@ export default function MyLibrary({ books }: { books: Book[] }) {
         readingListBooks={readingListBooks}
         completedBooks={completedBooks}
         currentlyReadingBook={currentlyReadingBook}
+        framePhoto={framePhoto}
+        frameEditable={role === "owner"}
+        flowerVariant={flowerVariant}
+        flowerEditable={role === "owner"}
         mobile={mobile}
         target={target}
         onTarget={(nextTarget) => setTarget((current) => {
           if (current?.kind === "book" && nextTarget?.kind === "book"
             && sameSelection(current.selection, nextTarget.selection)) return current;
-          if (current?.kind === nextTarget?.kind && current?.kind === "reading-shelf") return current;
+          if (current?.kind === "flower-trough" && nextTarget?.kind === "flower-trough"
+            && current.side === nextTarget.side) return current;
+          if (current?.kind === nextTarget?.kind
+            && current?.kind !== "book"
+            && current?.kind !== "flower-trough") return current;
           return nextTarget;
         })}
         onActivateTarget={openTarget}
@@ -403,7 +433,15 @@ export default function MyLibrary({ books }: { books: Book[] }) {
 
       {moving && <div className="crosshair" aria-hidden="true"><span/><span/></div>}
       <div className={`target-card ${moving && target ? "is-visible" : ""}`} aria-live="polite">
-        {target?.kind === "reading-shelf" ? <>
+        {target?.kind === "flower-trough" ? <>
+          <span>FLOWER TROUGHS</span>
+          <strong>Choose the flowers</strong>
+          <small>Select either trough to update the matching pair</small>
+        </> : target?.kind === "picture-frame" ? <>
+          <span>PERSONAL PICTURE</span>
+          <strong>Choose a picture</strong>
+          <small>Select the frame to browse your photos</small>
+        </> : target?.kind === "reading-shelf" ? <>
           <span>{role === "owner" ? "OPEN CATALOGUE" : "READING LIST"}</span>
           <strong>Want to read</strong>
           <small>{role === "owner" ? "Select this shelf to add a book" : "Owner access required to edit"}</small>
@@ -512,6 +550,63 @@ export default function MyLibrary({ books }: { books: Book[] }) {
           type="button"
           onClick={() => setVisibleCatalogueCount((count) => count + 50)}
         >Show 50 more</button>}
+      </article>
+    </div>}
+
+    {mode === "photo-picker" && role === "owner" && <div className="backdrop" role="presentation">
+      <article className="photo-picker" role="dialog" aria-modal="true" aria-labelledby="photo-picker-title">
+        <button ref={photoPickerCloseRef} className="close" type="button" onClick={closeOverlay} aria-label="Close picture picker">×</button>
+        <p className="eyebrow">OWNER MODE</p>
+        <h2 id="photo-picker-title">Choose a picture</h2>
+        <p>Select a preview to place it in the wooden frame.</p>
+        <div className="photo-picker-grid">
+          {PHOTO_OPTIONS.map((photo) => <button
+            key={photo.id}
+            className={framePhotoId === photo.id ? "is-selected" : ""}
+            type="button"
+            onClick={() => {
+              setFramePhotoId(photo.id);
+              closeOverlay();
+            }}
+          >
+            <Image src={photo.previewSrc} alt="" width={360} height={240} sizes="(max-width: 700px) 76vw, 210px" />
+            <span>{photo.label}</span>
+          </button>)}
+        </div>
+        <button
+          className="clear-frame"
+          type="button"
+          onClick={() => {
+            setFramePhotoId(null);
+            closeOverlay();
+          }}
+          disabled={framePhotoId === null}
+        >Clear frame</button>
+      </article>
+    </div>}
+
+    {mode === "flower-picker" && role === "owner" && <div className="backdrop" role="presentation">
+      <article className="photo-picker flower-picker" role="dialog" aria-modal="true" aria-labelledby="flower-picker-title">
+        <button ref={flowerPickerCloseRef} className="close" type="button" onClick={closeOverlay} aria-label="Close flower picker">×</button>
+        <p className="eyebrow">OWNER MODE</p>
+        <h2 id="flower-picker-title">Choose your flowers</h2>
+        <p>Your selection will be applied to both troughs.</p>
+        <div className="photo-picker-grid flower-picker-grid">
+          {(["orchid", "sunflower", "empty"] as const).map((variant) => <button
+            key={variant}
+            className={flowerVariant === variant ? "is-selected" : ""}
+            type="button"
+            onClick={() => {
+              setFlowerVariant(variant);
+              closeOverlay();
+            }}
+          >
+            <span className={`flower-option-preview is-${variant}`} aria-hidden="true">
+              {variant === "orchid" ? "✿" : variant === "sunflower" ? "●" : "—"}
+            </span>
+            <span>{variant === "empty" ? "Empty troughs" : variant}</span>
+          </button>)}
+        </div>
       </article>
     </div>}
 
