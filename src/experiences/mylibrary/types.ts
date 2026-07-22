@@ -20,4 +20,9 @@ export interface CuratedLibraryState {
   completedSerials: number[];
 }
 
-export type MyLibraryMode = "role" | "pause" | "resume" | "moving" | "catalogue" | "info" | "photo-picker" | "flower-picker";
+export interface BookReview {
+  rating: number;
+  comment: string;
+}
+
+export type MyLibraryMode = "role" | "pause" | "resume" | "moving" | "catalogue" | "info" | "photo-picker" | "flower-picker" | "review";

@@ -12,6 +12,7 @@ import {
   READING_LIST_CAPACITY,
 } from "@/experiences/mylibrary/layout";
 import type {
+  BookReview,
   CuratedLibraryState,
   MyLibraryMode,
   MyLibraryRole,
@@ -23,6 +24,20 @@ import {
   PHOTO_OPTIONS,
   type PhotoId,
 } from "@/experiences/mylibrary/photoOptions";
+
+type ReviewIntent = {
+  kind: "complete" | "edit";
+  selection: MyLibrarySelection;
+};
+
+const VISITOR_REVIEW_COMMENTS = [
+  "A thoughtful read that stayed with me after the final page.",
+  "I enjoyed the sense of place and the characters’ distinct voices.",
+  "A compelling book with several moments I wanted to revisit.",
+  "The story unfolded slowly, but the ending made the journey worthwhile.",
+  "An engaging perspective that gave me plenty to think about.",
+  "Beautifully observed and easy to recommend to another reader.",
+];
 
 const RoomScene = dynamic(() => import("@/experiences/mylibrary/RoomScene"), {
   ssr: false,
@@ -53,6 +68,16 @@ function visitorLibrary(books: Book[]): CuratedLibraryState {
     currentlyReadingSerial: serials[12] ?? null,
     readingListSerials: serials.slice(13, 19),
   };
+}
+
+function visitorReviews(completedSerials: number[]): Record<number, BookReview> {
+  return Object.fromEntries(completedSerials.flatMap((serial, index) => {
+    if (index % 3 === 2) return [];
+    return [[serial, {
+      rating: 3 + (serial % 3),
+      comment: VISITOR_REVIEW_COMMENTS[serial % VISITOR_REVIEW_COMMENTS.length],
+    } satisfies BookReview]];
+  }));
 }
 
 function sameSelection(left: MyLibrarySelection | null, right: MyLibrarySelection | null) {
@@ -137,6 +162,10 @@ export default function MyLibrary({ books }: { books: Book[] }) {
   const [target, setTarget] = useState<MyLibraryTarget | null>(null);
   const [framePhotoId, setFramePhotoId] = useState<PhotoId | null>(null);
   const [flowerVariant, setFlowerVariant] = useState<FlowerVariant>("empty");
+  const [reviews, setReviews] = useState<Record<number, BookReview>>({});
+  const [reviewIntent, setReviewIntent] = useState<ReviewIntent | null>(null);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
   const [catalogueField, setCatalogueField] = useState<CatalogueField | "">("");
   const [catalogueQuery, setCatalogueQuery] = useState("");
   const [visibleCatalogueCount, setVisibleCatalogueCount] = useState(50);
@@ -150,6 +179,7 @@ export default function MyLibrary({ books }: { books: Book[] }) {
   const infoCloseRef = useRef<HTMLButtonElement>(null);
   const photoPickerCloseRef = useRef<HTMLButtonElement>(null);
   const flowerPickerCloseRef = useRef<HTMLButtonElement>(null);
+  const reviewCloseRef = useRef<HTMLButtonElement>(null);
 
   const changeMode = useCallback((next: MyLibraryMode) => {
     modeRef.current = next;
@@ -204,6 +234,7 @@ export default function MyLibrary({ books }: { books: Book[] }) {
     ? navigationBooks[selectedNavigationIndex + 1]
     : null;
   const selectedAppearance = selection ? resolveBookAppearance(selection.book) : null;
+  const selectedReview = selection ? reviews[selection.book.serialNumber] : undefined;
   const framePhoto = PHOTO_OPTIONS.find((photo) => photo.id === framePhotoId) ?? null;
 
   useEffect(() => {
@@ -217,7 +248,7 @@ export default function MyLibrary({ books }: { books: Book[] }) {
   }, []);
 
   useEffect(() => {
-    const overlayOpen = mode === "role" || mode === "catalogue" || mode === "info" || mode === "photo-picker" || mode === "flower-picker";
+    const overlayOpen = mode === "role" || mode === "catalogue" || mode === "info" || mode === "photo-picker" || mode === "flower-picker" || mode === "review";
     if (!overlayOpen) return;
     const frame = requestAnimationFrame(() => {
       if (mode === "role") ownerRoleRef.current?.focus();
@@ -225,6 +256,7 @@ export default function MyLibrary({ books }: { books: Book[] }) {
       if (mode === "info") infoCloseRef.current?.focus();
       if (mode === "photo-picker") photoPickerCloseRef.current?.focus();
       if (mode === "flower-picker") flowerPickerCloseRef.current?.focus();
+      if (mode === "review") reviewCloseRef.current?.focus();
     });
     document.body.style.overflow = "hidden";
     return () => {
@@ -247,7 +279,11 @@ export default function MyLibrary({ books }: { books: Book[] }) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.repeat) return;
-      if (modeRef.current === "catalogue" || modeRef.current === "info" || modeRef.current === "photo-picker" || modeRef.current === "flower-picker") {
+      if (modeRef.current === "review") {
+        event.preventDefault();
+        setReviewIntent(null);
+        changeMode("info");
+      } else if (modeRef.current === "catalogue" || modeRef.current === "info" || modeRef.current === "photo-picker" || modeRef.current === "flower-picker") {
         event.preventDefault();
         setSelection(null);
         changeMode("resume");
@@ -258,8 +294,13 @@ export default function MyLibrary({ books }: { books: Book[] }) {
   }, [changeMode]);
 
   const chooseRole = useCallback((nextRole: MyLibraryRole) => {
+    const nextLibrary = nextRole === "visitor" ? visitorLibrary(books) : EMPTY_LIBRARY;
     setRole(nextRole);
-    setLibrary(nextRole === "visitor" ? visitorLibrary(books) : EMPTY_LIBRARY);
+    setLibrary(nextLibrary);
+    setReviews(nextRole === "visitor" ? visitorReviews(nextLibrary.completedSerials) : {});
+    setReviewIntent(null);
+    setReviewRating(0);
+    setReviewComment("");
     setFramePhotoId(nextRole === "visitor" ? DEFAULT_VISITOR_PHOTO_ID : null);
     setFlowerVariant(nextRole === "visitor" ? "orchid" : "empty");
     setSelection(null);
@@ -342,6 +383,12 @@ export default function MyLibrary({ books }: { books: Book[] }) {
       currentlyReadingSerial: current.currentlyReadingSerial === serial ? null : current.currentlyReadingSerial,
       completedSerials: current.completedSerials.filter((value) => value !== serial),
     }));
+    setReviews((current) => {
+      if (!(serial in current)) return current;
+      const next = { ...current };
+      delete next[serial];
+      return next;
+    });
     closeOverlay();
   }, [closeOverlay, role, selection]);
 
@@ -364,19 +411,56 @@ export default function MyLibrary({ books }: { books: Book[] }) {
 
   const moveSelectedToCompleted = useCallback(() => {
     if (role !== "owner" || !selection || selection.location === "completed") return;
-    const serial = selection.book.serialNumber;
-    setLibrary((current) => {
-      if (current.completedSerials.length >= COMPLETED_CAPACITY) return current;
-      return {
-        readingListSerials: current.readingListSerials.filter((value) => value !== serial),
-        currentlyReadingSerial: current.currentlyReadingSerial === serial ? null : current.currentlyReadingSerial,
-        completedSerials: current.completedSerials.includes(serial)
-          ? current.completedSerials
-          : [...current.completedSerials, serial],
-      };
-    });
-    closeOverlay();
-  }, [closeOverlay, role, selection]);
+    if (library.completedSerials.length >= COMPLETED_CAPACITY) return;
+    setReviewIntent({ kind: "complete", selection });
+    setReviewRating(0);
+    setReviewComment("");
+    changeMode("review");
+  }, [changeMode, library.completedSerials.length, role, selection]);
+
+  const editSelectedReview = useCallback(() => {
+    if (role !== "owner" || selection?.location !== "completed") return;
+    const existing = reviews[selection.book.serialNumber];
+    setReviewIntent({ kind: "edit", selection });
+    setReviewRating(existing?.rating ?? 0);
+    setReviewComment(existing?.comment ?? "");
+    changeMode("review");
+  }, [changeMode, reviews, role, selection]);
+
+  const cancelReview = useCallback(() => {
+    setReviewIntent(null);
+    changeMode("info");
+  }, [changeMode]);
+
+  const saveReview = useCallback(() => {
+    if (role !== "owner" || !reviewIntent || reviewRating < 1 || reviewRating > 5) return;
+    const serial = reviewIntent.selection.book.serialNumber;
+    if (reviewIntent.kind === "complete") {
+      if (library.completedSerials.length >= COMPLETED_CAPACITY) return;
+      setLibrary((current) => {
+        if (current.completedSerials.length >= COMPLETED_CAPACITY) return current;
+        return {
+          readingListSerials: current.readingListSerials.filter((value) => value !== serial),
+          currentlyReadingSerial: current.currentlyReadingSerial === serial ? null : current.currentlyReadingSerial,
+          completedSerials: current.completedSerials.includes(serial)
+            ? current.completedSerials
+            : [...current.completedSerials, serial],
+        };
+      });
+    }
+    setReviews((current) => ({
+      ...current,
+      [serial]: { rating: reviewRating, comment: reviewComment.trim() },
+    }));
+    const wasCompletion = reviewIntent.kind === "complete";
+    setReviewIntent(null);
+    if (wasCompletion) {
+      setSelection(null);
+      changeMode("resume");
+    } else {
+      changeMode("info");
+    }
+  }, [changeMode, library.completedSerials.length, reviewComment, reviewIntent, reviewRating, role]);
 
   const moving = mode === "moving";
   const canResume = mode === "pause" || mode === "resume";
@@ -610,6 +694,46 @@ export default function MyLibrary({ books }: { books: Book[] }) {
       </article>
     </div>}
 
+    {mode === "review" && role === "owner" && reviewIntent && <div className="backdrop" role="presentation">
+      <article className="review-dialog" role="dialog" aria-modal="true" aria-labelledby="review-dialog-title">
+        <button ref={reviewCloseRef} className="close" type="button" onClick={cancelReview} aria-label="Cancel review">×</button>
+        <p className="eyebrow">{reviewIntent.kind === "edit" ? "EDIT REVIEW" : "FINISH READING"}</p>
+        <h2 id="review-dialog-title">Review “{reviewIntent.selection.book.title}”</h2>
+        <p>{reviewIntent.kind === "edit"
+          ? "Update your rating or notes for this completed book."
+          : "Add a rating before moving this book to your completed shelf."}</p>
+        <form onSubmit={(event) => { event.preventDefault(); saveReview(); }}>
+          <fieldset className="review-rating">
+            <legend>Rating <span>required</span></legend>
+            <div>{[1, 2, 3, 4, 5].map((value) => <button
+              key={value}
+              type="button"
+              className={value <= reviewRating ? "is-selected" : ""}
+              aria-label={`${value} star${value === 1 ? "" : "s"}`}
+              aria-pressed={reviewRating === value}
+              onClick={() => setReviewRating(value)}
+            >★</button>)}</div>
+            <output aria-live="polite">{reviewRating ? `${reviewRating} out of 5 stars` : "Choose a rating"}</output>
+          </fieldset>
+          <label className="review-comment">
+            <span>Comments <small>optional</small></span>
+            <textarea
+              value={reviewComment}
+              onChange={(event) => setReviewComment(event.target.value)}
+              maxLength={500}
+              rows={5}
+              placeholder="What did you think of this book?"
+            />
+            <small>{reviewComment.length}/500</small>
+          </label>
+          <div className="review-dialog-actions">
+            <button className="secondary" type="button" onClick={cancelReview}>Cancel</button>
+            <button type="submit" disabled={!reviewRating}>{reviewIntent.kind === "edit" ? "Save review" : "Review and complete"}</button>
+          </div>
+        </form>
+      </article>
+    </div>}
+
     {mode === "info" && selection && selectedAppearance && <div className="backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && closeOverlay()}>
       <article className="detail" role="dialog" aria-modal="true" aria-labelledby="my-library-book-dialog-title">
         <button ref={infoCloseRef} className="close" type="button" onClick={closeOverlay} aria-label="Close book details">×</button>
@@ -639,12 +763,23 @@ export default function MyLibrary({ books }: { books: Book[] }) {
             <div><dt>Barcode</dt><dd>{selection.book.barcode}</dd></div>
             <div><dt>Serial number</dt><dd>{selection.book.serialNumber}</dd></div>
           </dl>
+          {selection.location === "completed" && <section className="book-review" aria-label="Book review">
+            <h3>Reader review</h3>
+            {selectedReview ? <>
+              <p className="book-review-rating" aria-label={`${selectedReview.rating} out of 5 stars`}>
+                <span aria-hidden="true">{"★".repeat(selectedReview.rating)}{"☆".repeat(5 - selectedReview.rating)}</span>
+                <small>{selectedReview.rating}/5</small>
+              </p>
+              {selectedReview.comment && <p className="book-review-comment">{selectedReview.comment}</p>}
+            </> : <p className="book-review-empty">No review has been added.</p>}
+          </section>}
           {role === "owner" ? <div className="detail-actions">
             {selection.location === "reading-list" && <>
               <button type="button" onClick={startReading}>Start reading</button>
               <button className="secondary" type="button" onClick={moveSelectedToCompleted} disabled={completedBooks.length >= COMPLETED_CAPACITY}>Move to completed</button>
             </>}
             {selection.location === "currently-reading" && <button type="button" onClick={moveSelectedToCompleted} disabled={completedBooks.length >= COMPLETED_CAPACITY}>Move to completed</button>}
+            {selection.location === "completed" && <button className="secondary" type="button" onClick={editSelectedReview}>{selectedReview ? "Edit review" : "Add review"}</button>}
             <button className="secondary danger" type="button" onClick={removeSelected}>Remove from My Library</button>
           </div> : <p className="read-only-note">Visitor mode · information only</p>}
         </div>
