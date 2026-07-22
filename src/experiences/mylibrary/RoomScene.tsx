@@ -9,7 +9,7 @@ import type { RoomControlsHandle } from "@/types/library";
 import type { Book } from "@/types/library";
 import { Bookcase } from "@/components/scene-assets/Bookcase";
 import { MosaicStool } from "@/components/scene-assets/MosaicStool";
-import { RoomEnvironment } from "@/components/scene-assets/RoomEnvironment";
+import { ROOM_WALL_COLOR, RoomEnvironment } from "@/components/scene-assets/RoomEnvironment";
 import { TiledDisplayTable } from "@/components/scene-assets/TiledDisplayTable";
 import { VintageGate } from "@/components/scene-assets/VintageGate";
 import { ROOM_HALF } from "@/components/scene-assets/roomLayout";
@@ -153,7 +153,7 @@ interface MyLibraryRoomSceneProps {
 
 export default function RoomScene(props: MyLibraryRoomSceneProps) {
   const handleCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
-    gl.setClearColor("#e8d9c5");
+    gl.setClearColor(ROOM_WALL_COLOR);
     gl.shadowMap.enabled = !props.mobile;
     gl.shadowMap.type = THREE.PCFSoftShadowMap;
   }, [props.mobile]);

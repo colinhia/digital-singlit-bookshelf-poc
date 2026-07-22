@@ -28,6 +28,7 @@ import {
 import type { BookVisualData } from "@/components/scene-assets/books/types";
 import {
   BOOK_FACE,
+  resolveTopDownTierY,
   SHELF_WIDTH,
   TIER_Y,
 } from "@/components/scene-assets/roomLayout";
@@ -83,7 +84,7 @@ function baseMatrix(item: CuratedShelfItem) {
   const positionOnTier = item.slotIndex % slotsPerTier;
   const step = shelfWidth / slotsPerTier;
   const along = -shelfWidth / 2 + step / 2 + positionOnTier * step;
-  const shelfY = tierY[tier] ?? tierY.at(-1) ?? 0;
+  const shelfY = resolveTopDownTierY(tierY, tier) ?? tierY[0] ?? 0;
   const position = isReadingList
     ? new THREE.Vector3(-BOOK_FACE, shelfY, -along)
     : new THREE.Vector3(along, shelfY, -BOOK_FACE);

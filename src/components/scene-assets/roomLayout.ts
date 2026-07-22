@@ -11,3 +11,7 @@ export const TIER_Y = Array.from(
   { length: BOOKCASE_TIER_COUNT },
   (_, index) => 0.48 + index * 0.92,
 );
+
+export function resolveTopDownTierY(tierY: readonly number[], logicalTier: number) {
+  return tierY[tierY.length - 1 - logicalTier];
+}
