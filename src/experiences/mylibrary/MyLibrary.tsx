@@ -28,6 +28,15 @@ const EMPTY_LIBRARY: CuratedLibraryState = {
   completedSerials: [],
 };
 
+type CatalogueField = "title" | "author" | "language" | "callNumber";
+
+const CATALOGUE_FIELDS: Array<{ value: CatalogueField; label: string }> = [
+  { value: "title", label: "Title" },
+  { value: "author", label: "Author" },
+  { value: "language", label: "Language" },
+  { value: "callNumber", label: "Call number" },
+];
+
 function visitorLibrary(books: Book[]): CuratedLibraryState {
   const serials = [...books]
     .sort((left, right) => left.serialNumber - right.serialNumber)
@@ -119,6 +128,7 @@ export default function MyLibrary({ books }: { books: Book[] }) {
   const [mode, setMode] = useState<MyLibraryMode>("role");
   const [selection, setSelection] = useState<MyLibrarySelection | null>(null);
   const [target, setTarget] = useState<MyLibraryTarget | null>(null);
+  const [catalogueField, setCatalogueField] = useState<CatalogueField | "">("");
   const [catalogueQuery, setCatalogueQuery] = useState("");
   const [visibleCatalogueCount, setVisibleCatalogueCount] = useState(50);
   const [catalogueNotice, setCatalogueNotice] = useState("");
@@ -127,7 +137,7 @@ export default function MyLibrary({ books }: { books: Book[] }) {
   const controlsRef = useRef<RoomControlsHandle | null>(null);
   const modeRef = useRef<MyLibraryMode>("role");
   const ownerRoleRef = useRef<HTMLButtonElement>(null);
-  const catalogueSearchRef = useRef<HTMLInputElement>(null);
+  const catalogueFieldRef = useRef<HTMLSelectElement>(null);
   const infoCloseRef = useRef<HTMLButtonElement>(null);
 
   const changeMode = useCallback((next: MyLibraryMode) => {
@@ -166,9 +176,9 @@ export default function MyLibrary({ books }: { books: Book[] }) {
     const term = catalogueQuery.trim().toLocaleLowerCase();
     return [...books]
       .sort((left, right) => left.serialNumber - right.serialNumber)
-      .filter((book) => !term || [book.title, book.author, book.language, book.callNumber]
-        .some((value) => value.toLocaleLowerCase().includes(term)));
-  }, [books, catalogueQuery]);
+      .filter((book) => !term || !catalogueField
+        || String(book[catalogueField]).toLocaleLowerCase().includes(term));
+  }, [books, catalogueField, catalogueQuery]);
   const visibleCatalogueBooks = matchingCatalogueBooks.slice(0, visibleCatalogueCount);
   const navigationBooks = selection?.location === "reading-list"
     ? readingListBooks
@@ -199,7 +209,7 @@ export default function MyLibrary({ books }: { books: Book[] }) {
     if (!overlayOpen) return;
     const frame = requestAnimationFrame(() => {
       if (mode === "role") ownerRoleRef.current?.focus();
-      if (mode === "catalogue") catalogueSearchRef.current?.focus();
+      if (mode === "catalogue") catalogueFieldRef.current?.focus();
       if (mode === "info") infoCloseRef.current?.focus();
     });
     document.body.style.overflow = "hidden";
@@ -446,20 +456,34 @@ export default function MyLibrary({ books }: { books: Book[] }) {
         <button className="close" type="button" onClick={closeOverlay} aria-label="Close catalogue">×</button>
         <p className="eyebrow">OWNER MODE</p>
         <h2 id="catalogue-title">Add to your reading list</h2>
-        <p className="catalogue-introduction">Browse the SingLit catalogue or search by title, author, language, or call number.</p>
-        <label className="catalogue-search">
-          <span>Search catalogue</span>
-          <div>
-            <span aria-hidden="true">⌕</span>
-            <input
-              ref={catalogueSearchRef}
-              value={catalogueQuery}
-              onChange={(event) => setCatalogueQuery(event.target.value)}
-              placeholder="Try a title, author, language, or call number…"
-            />
-            {catalogueQuery && <button type="button" onClick={() => setCatalogueQuery("")} aria-label="Clear catalogue search">×</button>}
-          </div>
-        </label>
+        <p className="catalogue-introduction">Browse the SingLit catalogue, or choose a query field and enter a search.</p>
+        <div className="search-controls catalogue-search-controls">
+          <label className="field-control">
+            <span>Type:</span>
+            <select
+              ref={catalogueFieldRef}
+              value={catalogueField}
+              onChange={(event) => setCatalogueField(event.target.value as CatalogueField)}
+            >
+              <option value="" disabled>Select a query field</option>
+              {CATALOGUE_FIELDS.map((field) => <option key={field.value} value={field.value}>{field.label}</option>)}
+            </select>
+          </label>
+          <label className="query-control">
+            <span>Query:</span>
+            <div className="query-input">
+              <span className="search-icon" aria-hidden="true">⌕</span>
+              <input
+                value={catalogueQuery}
+                onChange={(event) => setCatalogueQuery(event.target.value)}
+                placeholder={catalogueField
+                  ? `Search by ${CATALOGUE_FIELDS.find((field) => field.value === catalogueField)?.label.toLocaleLowerCase()}…`
+                  : "Select a query field first…"}
+              />
+              {catalogueQuery && <button type="button" onClick={() => setCatalogueQuery("")} aria-label="Clear catalogue search">×</button>}
+            </div>
+          </label>
+        </div>
         <div className="catalogue-status">
           <span><strong>{matchingCatalogueBooks.length}</strong> results</span>
           <span><strong>{readingListBooks.length}</strong>/{READING_LIST_CAPACITY} on reading list</span>
