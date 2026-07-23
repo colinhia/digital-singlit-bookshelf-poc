@@ -31,6 +31,7 @@ import type { BookVisualData } from "@/components/scene-assets/books/types";
 import { resolveTopDownTierY } from "@/components/scene-assets/roomLayout";
 
 const CENTER_POINTER = new THREE.Vector2(0, 0);
+const HIDDEN_MATRIX = new THREE.Matrix4().makeScale(0, 0, 0);
 
 interface BookRenderConfig {
   shelfWidth: number;
@@ -44,6 +45,16 @@ interface ProfiledBook {
   book: Book;
   slot: BookSlot;
   profile: BookRenderProfile;
+}
+
+interface RenderedBook extends ProfiledBook {
+  baseTransform: THREE.Matrix4;
+  spineMatrix: THREE.Matrix4;
+  pageMatrix: THREE.Matrix4;
+  leftBoardMatrix: THREE.Matrix4;
+  rightBoardMatrix: THREE.Matrix4;
+  coverColor: THREE.Color;
+  pageColor: THREE.Color;
 }
 
 function getProfiledBooks(books: Book[], capacity: number) {
@@ -78,27 +89,48 @@ function baseMatrix(item: ProfiledBook, config: BookRenderConfig) {
 }
 
 function layerMatrix(
-  item: ProfiledBook,
-  config: BookRenderConfig,
+  baseTransform: THREE.Matrix4,
   dimensions: [number, number, number],
   offset: [number, number, number] = [0, 0, 0],
 ) {
   const [width, height, depth] = dimensions;
-  return baseMatrix(item, config)
+  return baseTransform.clone()
     .multiply(new THREE.Matrix4().makeTranslation(offset[0], offset[1] + height / 2, offset[2]))
     .multiply(new THREE.Matrix4().makeScale(width, height, depth));
+}
+
+function createRenderedBooks(items: ProfiledBook[], config: BookRenderConfig): RenderedBook[] {
+  return items.map((item) => {
+    const baseTransform = baseMatrix(item, config);
+    const {
+      pageDimensions,
+      pageOffset,
+      spineDimensions,
+      spineOffset,
+      boardDimensions,
+      boardX,
+    } = resolveBookLayerGeometry(item.profile);
+    return {
+      ...item,
+      baseTransform,
+      spineMatrix: layerMatrix(baseTransform, spineDimensions, spineOffset),
+      pageMatrix: layerMatrix(baseTransform, pageDimensions, pageOffset),
+      leftBoardMatrix: layerMatrix(baseTransform, boardDimensions, [-boardX, 0, 0]),
+      rightBoardMatrix: layerMatrix(baseTransform, boardDimensions, [boardX, 0, 0]),
+      coverColor: new THREE.Color(getBookAppearanceColor(resolveBookAppearance(item.book))),
+      pageColor: new THREE.Color(getBookPageColor(item.book)),
+    };
+  });
 }
 
 function BookTitleBatch({
   items,
   matchingSerials,
-  config,
   fontFamilies,
   columns,
 }: {
-  items: ProfiledBook[];
+  items: RenderedBook[];
   matchingSerials: Set<number>;
-  config: BookRenderConfig;
   fontFamilies: SpineFontFamilies;
   columns: number;
 }) {
@@ -160,7 +192,7 @@ function BookTitleBatch({
       items.forEach((item, index) => {
         if (matchingSerials.has(item.book.serialNumber) !== matchesFilter) return;
         const { profile } = item;
-        const transform = baseMatrix(item, config);
+        const transform = item.baseTransform;
         const firstVertex = positions.length / 3;
         const halfWidth = profile.width * 0.44;
         const bottom = 0;
@@ -191,7 +223,7 @@ function BookTitleBatch({
       return result;
     };
     return { matching: createGeometry(true), filtered: createGeometry(false) };
-  }, [columns, config, items, matchingSerials]);
+  }, [columns, items, matchingSerials]);
 
   useEffect(() => () => texture.dispose(), [texture]);
   useEffect(() => () => {
@@ -209,7 +241,7 @@ function BookTitleBatch({
   </>;
 }
 
-function BookTitles({ items, matchingSerials, config }: { items: ProfiledBook[]; matchingSerials: Set<number>; config: BookRenderConfig }) {
+function BookTitles({ items, matchingSerials }: { items: RenderedBook[]; matchingSerials: Set<number> }) {
   const { gl } = useThree();
   const fontFamilies = useSpineFontFamilies(items);
   const maximumTextureSize = gl.capabilities.maxTextureSize;
@@ -225,7 +257,6 @@ function BookTitles({ items, matchingSerials, config }: { items: ProfiledBook[];
     key={`${index}-${batch[0]?.book.serialNumber ?? "empty"}`}
     items={batch}
     matchingSerials={matchingSerials}
-    config={config}
     fontFamilies={fontFamilies}
     columns={columns}
   />)}</>;
@@ -239,11 +270,10 @@ function getTableBookUserData(_book: BookVisualData, index: number) {
   return { tableBookIndex: index };
 }
 
-function RealisticBooks({ items, tableBooks, matchingSerials, config, onSelect, onTarget, target }: {
-  items: ProfiledBook[];
+function RealisticBooks({ items, tableBooks, matchingSerials, onSelect, onTarget, target }: {
+  items: RenderedBook[];
   tableBooks: Book[];
   matchingSerials: Set<number>;
-  config: BookRenderConfig;
   onSelect: (selection: BookSelection) => void;
   onTarget: (selection: BookSelection | null) => void;
   target: BookSelection | null;
@@ -280,36 +310,22 @@ function RealisticBooks({ items, tableBooks, matchingSerials, config, onSelect, 
     const filteredBoards = filteredBoardsRef.current;
     if (!matchingSpine || !matchingPages || !matchingBoards || !filteredSpine || !filteredPages || !filteredBoards) return;
 
-    const hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
-    const pageColor = new THREE.Color();
-    const coverColor = new THREE.Color();
     items.forEach((item, index) => {
-      const { profile, book } = item;
-      const matches = matchingSerials.has(book.serialNumber);
-      const { pageDimensions, pageOffset, spineDimensions, spineOffset, boardDimensions, boardX } = resolveBookLayerGeometry(profile);
-      const spineMatrix = layerMatrix(item, config, spineDimensions, spineOffset);
-      const pageMatrix = layerMatrix(item, config, pageDimensions, pageOffset);
-      matchingSpine.setMatrixAt(index, matches ? spineMatrix : hiddenMatrix);
-      filteredSpine.setMatrixAt(index, matches ? hiddenMatrix : spineMatrix);
-      matchingPages.setMatrixAt(index, matches ? pageMatrix : hiddenMatrix);
-      filteredPages.setMatrixAt(index, matches ? hiddenMatrix : pageMatrix);
-
-      coverColor.set(getBookAppearanceColor(resolveBookAppearance(book)));
-      pageColor.set(getBookPageColor(book));
-      matchingSpine.setColorAt(index, coverColor);
-      filteredSpine.setColorAt(index, coverColor);
-      matchingPages.setColorAt(index, pageColor);
-      filteredPages.setColorAt(index, pageColor);
-
-      const leftBoardMatrix = layerMatrix(item, config, boardDimensions, [-boardX, 0, 0]);
-      const rightBoardMatrix = layerMatrix(item, config, boardDimensions, [boardX, 0, 0]);
-      matchingBoards.setMatrixAt(index * 2, matches ? leftBoardMatrix : hiddenMatrix);
-      matchingBoards.setMatrixAt(index * 2 + 1, matches ? rightBoardMatrix : hiddenMatrix);
-      filteredBoards.setMatrixAt(index * 2, matches ? hiddenMatrix : leftBoardMatrix);
-      filteredBoards.setMatrixAt(index * 2 + 1, matches ? hiddenMatrix : rightBoardMatrix);
+      matchingSpine.setMatrixAt(index, item.spineMatrix);
+      filteredSpine.setMatrixAt(index, item.spineMatrix);
+      matchingPages.setMatrixAt(index, item.pageMatrix);
+      filteredPages.setMatrixAt(index, item.pageMatrix);
+      matchingSpine.setColorAt(index, item.coverColor);
+      filteredSpine.setColorAt(index, item.coverColor);
+      matchingPages.setColorAt(index, item.pageColor);
+      filteredPages.setColorAt(index, item.pageColor);
+      matchingBoards.setMatrixAt(index * 2, item.leftBoardMatrix);
+      matchingBoards.setMatrixAt(index * 2 + 1, item.rightBoardMatrix);
+      filteredBoards.setMatrixAt(index * 2, item.leftBoardMatrix);
+      filteredBoards.setMatrixAt(index * 2 + 1, item.rightBoardMatrix);
       [matchingBoards, filteredBoards].forEach((boards) => {
-        boards.setColorAt(index * 2, coverColor);
-        boards.setColorAt(index * 2 + 1, coverColor);
+        boards.setColorAt(index * 2, item.coverColor);
+        boards.setColorAt(index * 2 + 1, item.coverColor);
       });
     });
 
@@ -321,7 +337,33 @@ function RealisticBooks({ items, tableBooks, matchingSerials, config, onSelect, 
       mesh.computeBoundingSphere();
     });
     invalidate();
-  }, [config, invalidate, items, matchingSerials]);
+  }, [invalidate, items]);
+
+  useEffect(() => {
+    const matchingSpine = matchingSpineRef.current;
+    const matchingPages = matchingPagesRef.current;
+    const matchingBoards = matchingBoardsRef.current;
+    const filteredSpine = filteredSpineRef.current;
+    const filteredPages = filteredPagesRef.current;
+    const filteredBoards = filteredBoardsRef.current;
+    if (!matchingSpine || !matchingPages || !matchingBoards || !filteredSpine || !filteredPages || !filteredBoards) return;
+
+    items.forEach((item, index) => {
+      const matches = matchingSerials.has(item.book.serialNumber);
+      matchingSpine.setMatrixAt(index, matches ? item.spineMatrix : HIDDEN_MATRIX);
+      filteredSpine.setMatrixAt(index, matches ? HIDDEN_MATRIX : item.spineMatrix);
+      matchingPages.setMatrixAt(index, matches ? item.pageMatrix : HIDDEN_MATRIX);
+      filteredPages.setMatrixAt(index, matches ? HIDDEN_MATRIX : item.pageMatrix);
+      matchingBoards.setMatrixAt(index * 2, matches ? item.leftBoardMatrix : HIDDEN_MATRIX);
+      matchingBoards.setMatrixAt(index * 2 + 1, matches ? item.rightBoardMatrix : HIDDEN_MATRIX);
+      filteredBoards.setMatrixAt(index * 2, matches ? HIDDEN_MATRIX : item.leftBoardMatrix);
+      filteredBoards.setMatrixAt(index * 2 + 1, matches ? HIDDEN_MATRIX : item.rightBoardMatrix);
+    });
+    [matchingSpine, matchingPages, matchingBoards, filteredSpine, filteredPages, filteredBoards].forEach((mesh) => {
+      mesh.instanceMatrix.needsUpdate = true;
+    });
+    invalidate();
+  }, [invalidate, items, matchingSerials]);
 
   useEffect(() => {
     const currentTarget = targetRef.current;
@@ -437,9 +479,10 @@ export default function BookCollection({ books, tableBooks, matchingSerials, onS
   capacity: number;
 }) {
   const config = useMemo<BookRenderConfig>(() => ({ shelfWidth, bookFace, tierY, slotsPerTier, capacity }), [bookFace, capacity, shelfWidth, slotsPerTier, tierY]);
-  const items = useMemo(() => getProfiledBooks(books, capacity), [books, capacity]);
+  const profiledItems = useMemo(() => getProfiledBooks(books, capacity), [books, capacity]);
+  const items = useMemo(() => createRenderedBooks(profiledItems, config), [config, profiledItems]);
   return <>
-    <RealisticBooks items={items} tableBooks={tableBooks} matchingSerials={matchingSerials} config={config} onSelect={onSelect} onTarget={onTarget} target={target} />
-    <BookTitles items={items} matchingSerials={matchingSerials} config={config} />
+    <RealisticBooks items={items} tableBooks={tableBooks} matchingSerials={matchingSerials} onSelect={onSelect} onTarget={onTarget} target={target} />
+    <BookTitles items={items} matchingSerials={matchingSerials} />
   </>;
 }
