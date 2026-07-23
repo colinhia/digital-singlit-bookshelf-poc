@@ -33,6 +33,17 @@ import { resolveTopDownTierY } from "@/components/scene-assets/roomLayout";
 const CENTER_POINTER = new THREE.Vector2(0, 0);
 const HIDDEN_MATRIX = new THREE.Matrix4().makeScale(0, 0, 0);
 
+type TitleIndexArray = Uint16Array | Uint32Array;
+
+function writeTitleQuadIndices(target: TitleIndexArray, offset: number, firstVertex: number) {
+  target[offset] = firstVertex;
+  target[offset + 1] = firstVertex + 1;
+  target[offset + 2] = firstVertex + 2;
+  target[offset + 3] = firstVertex;
+  target[offset + 4] = firstVertex + 2;
+  target[offset + 5] = firstVertex + 3;
+}
+
 interface BookRenderConfig {
   shelfWidth: number;
   bookFace: number;
@@ -134,6 +145,7 @@ function BookTitleBatch({
   fontFamilies: SpineFontFamilies;
   columns: number;
 }) {
+  const invalidate = useThree((state) => state.invalidate);
   const texture = useMemo(() => {
     const rows = Math.max(1, Math.ceil(items.length / columns));
     const canvas = document.createElement("canvas");
@@ -184,46 +196,82 @@ function BookTitleBatch({
 
   const geometries = useMemo(() => {
     const rows = Math.max(1, Math.ceil(items.length / columns));
-    const createGeometry = (matchesFilter: boolean) => {
-      const positions: number[] = [];
-      const uvs: number[] = [];
-      const indices: number[] = [];
-      const vertex = new THREE.Vector3();
-      items.forEach((item, index) => {
-        if (matchingSerials.has(item.book.serialNumber) !== matchesFilter) return;
-        const { profile } = item;
-        const transform = item.baseTransform;
-        const firstVertex = positions.length / 3;
-        const halfWidth = profile.width * 0.44;
-        const bottom = 0;
-        const top = profile.height;
-        const front = profile.depth / 2 + 0.006;
-        const corners: [number, number, number][] = [
-          [-halfWidth, bottom, front], [halfWidth, bottom, front],
-          [halfWidth, top, front], [-halfWidth, top, front],
-        ];
-        corners.forEach((corner) => {
-          vertex.set(...corner).applyMatrix4(transform);
-          positions.push(vertex.x, vertex.y, vertex.z);
-        });
-        const column = index % columns;
-        const row = Math.floor(index / columns);
-        const u0 = column / columns;
-        const u1 = (column + 1) / columns;
-        const vTop = 1 - row / rows;
-        const vBottom = 1 - (row + 1) / rows;
-        uvs.push(u0, vBottom, u1, vBottom, u1, vTop, u0, vTop);
-        indices.push(firstVertex, firstVertex + 1, firstVertex + 2, firstVertex, firstVertex + 2, firstVertex + 3);
+    const positions = new Float32Array(items.length * 4 * 3);
+    const uvs = new Float32Array(items.length * 4 * 2);
+    const vertex = new THREE.Vector3();
+    items.forEach((item, index) => {
+      const halfWidth = item.profile.width * 0.44;
+      const top = item.profile.height;
+      const front = item.profile.depth / 2 + 0.006;
+      const corners: [number, number, number][] = [
+        [-halfWidth, 0, front], [halfWidth, 0, front],
+        [halfWidth, top, front], [-halfWidth, top, front],
+      ];
+      corners.forEach((corner, cornerIndex) => {
+        vertex.set(...corner).applyMatrix4(item.baseTransform);
+        const positionOffset = index * 12 + cornerIndex * 3;
+        positions[positionOffset] = vertex.x;
+        positions[positionOffset + 1] = vertex.y;
+        positions[positionOffset + 2] = vertex.z;
       });
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      const u0 = column / columns;
+      const u1 = (column + 1) / columns;
+      const vTop = 1 - row / rows;
+      const vBottom = 1 - (row + 1) / rows;
+      const uvOffset = index * 8;
+      uvs[uvOffset] = u0;
+      uvs[uvOffset + 1] = vBottom;
+      uvs[uvOffset + 2] = u1;
+      uvs[uvOffset + 3] = vBottom;
+      uvs[uvOffset + 4] = u1;
+      uvs[uvOffset + 5] = vTop;
+      uvs[uvOffset + 6] = u0;
+      uvs[uvOffset + 7] = vTop;
+    });
+
+    const IndexArray = items.length * 4 > 65_535 ? Uint32Array : Uint16Array;
+    const createGeometry = () => {
       const result = new THREE.BufferGeometry();
-      result.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-      result.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-      result.setIndex(indices);
+      result.setAttribute("position", new THREE.BufferAttribute(positions.slice(), 3));
+      result.setAttribute("uv", new THREE.BufferAttribute(uvs.slice(), 2));
+      const index = new THREE.BufferAttribute(new IndexArray(items.length * 6), 1);
+      index.setUsage(THREE.DynamicDrawUsage);
+      result.setIndex(index);
+      result.setDrawRange(0, 0);
       result.computeBoundingSphere();
       return result;
     };
-    return { matching: createGeometry(true), filtered: createGeometry(false) };
-  }, [columns, items, matchingSerials]);
+    return { matching: createGeometry(), filtered: createGeometry() };
+  }, [columns, items]);
+
+  useEffect(() => {
+    const matchingIndex = geometries.matching.getIndex();
+    const filteredIndex = geometries.filtered.getIndex();
+    if (!matchingIndex || !filteredIndex) return;
+    const matchingArray = matchingIndex.array as TitleIndexArray;
+    const filteredArray = filteredIndex.array as TitleIndexArray;
+    let matchingCount = 0;
+    let filteredCount = 0;
+
+    items.forEach((item, index) => {
+      const firstVertex = index * 4;
+      if (matchingSerials.has(item.book.serialNumber)) {
+        writeTitleQuadIndices(matchingArray, matchingCount, firstVertex);
+        matchingCount += 6;
+      } else {
+        writeTitleQuadIndices(filteredArray, filteredCount, firstVertex);
+        filteredCount += 6;
+      }
+    });
+
+    matchingIndex.needsUpdate = true;
+    filteredIndex.needsUpdate = true;
+    geometries.matching.setDrawRange(0, matchingCount);
+    geometries.filtered.setDrawRange(0, filteredCount);
+    invalidate();
+  }, [geometries, invalidate, items, matchingSerials]);
 
   useEffect(() => () => texture.dispose(), [texture]);
   useEffect(() => () => {
