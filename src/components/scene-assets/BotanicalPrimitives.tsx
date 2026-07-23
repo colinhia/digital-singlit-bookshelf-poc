@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
+import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
 export type Point = [number, number, number];
@@ -14,6 +15,7 @@ export interface PartTransform {
 
 export function InstancedFlatParts({ transforms }: { transforms: PartTransform[] }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
+  const invalidate = useThree((state) => state.invalidate);
 
   useEffect(() => {
     const mesh = meshRef.current;
@@ -28,7 +30,8 @@ export function InstancedFlatParts({ transforms }: { transforms: PartTransform[]
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [transforms]);
+    invalidate();
+  }, [invalidate, transforms]);
 
   return <instancedMesh ref={meshRef} args={[undefined, undefined, transforms.length]} castShadow>
     <circleGeometry args={[1, 7]} />
@@ -38,6 +41,7 @@ export function InstancedFlatParts({ transforms }: { transforms: PartTransform[]
 
 export function InstancedLeafParts({ transforms }: { transforms: PartTransform[] }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
+  const invalidate = useThree((state) => state.invalidate);
   const leafShape = useMemo(() => {
     const shape = new THREE.Shape();
     shape.moveTo(0, 0);
@@ -59,7 +63,8 @@ export function InstancedLeafParts({ transforms }: { transforms: PartTransform[]
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [transforms]);
+    invalidate();
+  }, [invalidate, transforms]);
 
   return <instancedMesh ref={meshRef} args={[undefined, undefined, transforms.length]} castShadow>
     <shapeGeometry args={[leafShape, 5]} />
@@ -69,6 +74,7 @@ export function InstancedLeafParts({ transforms }: { transforms: PartTransform[]
 
 export function InstancedRoundParts({ transforms }: { transforms: PartTransform[] }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
+  const invalidate = useThree((state) => state.invalidate);
 
   useEffect(() => {
     const mesh = meshRef.current;
@@ -83,7 +89,8 @@ export function InstancedRoundParts({ transforms }: { transforms: PartTransform[
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [transforms]);
+    invalidate();
+  }, [invalidate, transforms]);
 
   return <instancedMesh ref={meshRef} args={[undefined, undefined, transforms.length]} castShadow>
     <sphereGeometry args={[1, 7, 5]} />

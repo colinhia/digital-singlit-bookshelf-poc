@@ -44,7 +44,7 @@ function CameraRig({
   onLock: () => void;
   onUnlock: () => void;
 }) {
-  const { camera, gl } = useThree();
+  const { camera, gl, invalidate } = useThree();
   const drag = useRef({ active: false, moved: false, x: 0, y: 0 });
   const controlsRef = useRef<PointerLockControlsImpl | null>(null);
 
@@ -52,7 +52,8 @@ function CameraRig({
     camera.position.set(0, CAMERA_HEIGHT, 0.7);
     camera.rotation.order = "YXZ";
     camera.lookAt(0, CAMERA_HEIGHT, -5);
-  }, [camera]);
+    invalidate();
+  }, [camera, invalidate]);
 
   useEffect(() => {
     if (mobile) return;
@@ -82,6 +83,7 @@ function CameraRig({
         MOBILE_MIN_PITCH,
         MOBILE_MAX_PITCH,
       );
+      invalidate();
       drag.current.x = event.clientX;
       drag.current.y = event.clientY;
     };
@@ -97,7 +99,7 @@ function CameraRig({
       element.removeEventListener("pointermove", move);
       element.removeEventListener("pointerup", up);
     };
-  }, [camera, gl.domElement, mobile, onActivateTarget, target]);
+  }, [camera, gl.domElement, invalidate, mobile, onActivateTarget, target]);
 
   return mobile ? null : <PointerLockControls
     ref={controlsRef}
@@ -171,6 +173,7 @@ export default function RoomScene(props: MyLibraryRoomSceneProps) {
   return <Canvas
     camera={{ position: [0, CAMERA_HEIGHT, 0.7], fov: 68, near: 0.1, far: 40 }}
     dpr={props.mobile ? [1, 1.25] : [1, 1.7]}
+    frameloop="demand"
     shadows={!props.mobile}
     onCreated={handleCreated}
     gl={{ antialias: true, powerPreference: "high-performance" }}

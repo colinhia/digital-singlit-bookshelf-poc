@@ -255,7 +255,7 @@ function RealisticBooks({ items, tableBooks, matchingSerials, config, onSelect, 
   const tableGroupRef = useRef<THREE.Group>(null);
   const targetRef = useRef<BookSelection | null>(null);
   const targetIndexRef = useRef<number | null>(null);
-  const { camera } = useThree();
+  const { camera, invalidate } = useThree();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const geometries = useBookGeometries();
 
@@ -315,7 +315,8 @@ function RealisticBooks({ items, tableBooks, matchingSerials, config, onSelect, 
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       mesh.computeBoundingSphere();
     });
-  }, [config, items, matchingSerials]);
+    invalidate();
+  }, [config, invalidate, items, matchingSerials]);
 
   useEffect(() => {
     const currentTarget = targetRef.current;
@@ -334,7 +335,8 @@ function RealisticBooks({ items, tableBooks, matchingSerials, config, onSelect, 
     targetIndexRef.current = null;
     targetRef.current = null;
     onTarget(null);
-  }, [items, matchingSerials, onTarget, tableBooks]);
+    invalidate();
+  }, [invalidate, items, matchingSerials, onTarget, tableBooks]);
 
   useFrame(() => {
     const matchingSpine = matchingSpineRef.current;

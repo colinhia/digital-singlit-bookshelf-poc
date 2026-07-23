@@ -281,7 +281,7 @@ export default function CuratedBooks({
   const flowerTroughRefs = useRef<Array<THREE.Group | null>>([]);
   const targetRef = useRef<MyLibraryTarget | null>(null);
   const targetIndexRef = useRef<number | null>(null);
-  const { camera } = useThree();
+  const { camera, invalidate } = useThree();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const geometries = useBookGeometries();
   const instanceCapacity = Math.max(1, items.length);
@@ -320,7 +320,8 @@ export default function CuratedBooks({
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       mesh.computeBoundingSphere();
     });
-  }, [items]);
+    invalidate();
+  }, [invalidate, items]);
 
   useEffect(() => {
     const current = targetRef.current;
