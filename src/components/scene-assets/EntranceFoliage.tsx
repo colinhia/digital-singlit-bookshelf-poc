@@ -5,10 +5,12 @@ import * as THREE from "three";
 import {
   InstancedFlatParts,
   InstancedRoundParts,
-  StemSegment,
+  InstancedStemSegments,
   type PartTransform,
   type Point,
+  type StemSegmentSpec,
 } from "@/components/scene-assets/BotanicalPrimitives";
+import { InstancedCylinders } from "@/components/scene-assets/InstancedCylinders";
 import { OrchidPlanter } from "@/components/scene-assets/PlanterFlowers";
 
 const BOUGAINVILLEA_PATHS: Point[][] = [
@@ -16,6 +18,14 @@ const BOUGAINVILLEA_PATHS: Point[][] = [
   [[-1.32, 2.05, 0], [-0.94, 2.58, -0.01], [-0.72, 3.16, 0.02]],
   [[-1.18, 4.84, 0], [-0.55, 5.06, 0.01], [0.18, 4.99, -0.01], [0.62, 4.84, 0]],
 ];
+function stemSegments(paths: Point[][]): StemSegmentSpec[] {
+  return paths.flatMap((path) => path.slice(0, -1).map((from, index) => ({
+    from,
+    to: path[index + 1],
+  })));
+}
+const MAIN_BOUGAINVILLEA_STEMS = stemSegments([BOUGAINVILLEA_PATHS[0]]);
+const BRANCH_BOUGAINVILLEA_STEMS = stemSegments(BOUGAINVILLEA_PATHS.slice(1));
 
 const LEAF_COLORS = ["#31563a", "#416840", "#557846"];
 const BOUGAINVILLEA_COLORS = ["#bd4c9d", "#d663b1", "#9e438b"];
@@ -51,12 +61,8 @@ function BougainvilleaLeaves() {
   }), []);
 
   return <group>
-    {BOUGAINVILLEA_PATHS.flatMap((path, pathIndex) => path.slice(0, -1).map((point, index) => <StemSegment
-      key={`bougainvillea-stem-${pathIndex}-${index}`}
-      from={point}
-      to={path[index + 1]}
-      radius={pathIndex === 0 ? 0.022 : 0.014}
-    />))}
+    <InstancedStemSegments segments={MAIN_BOUGAINVILLEA_STEMS} radius={0.022} />
+    <InstancedStemSegments segments={BRANCH_BOUGAINVILLEA_STEMS} radius={0.014} />
     <InstancedFlatParts transforms={leaves} />
   </group>;
 }
@@ -109,7 +115,18 @@ export function PerimeterFoliage({ roomHalf, bookcaseFace, bookcaseWidth, tierY 
   bookcaseWidth: number;
   tierY: number[];
 }) {
-  const { basketSpecs, cords, stems, leaves, bracts, centres, motifBracts, motifCentres } = useMemo(() => {
+  const {
+    basketPositions,
+    basketRimPositions,
+    basketSoilPositions,
+    cords,
+    stems,
+    leaves,
+    bracts,
+    centres,
+    motifBracts,
+    motifCentres,
+  } = useMemo(() => {
     const inset = roomHalf - 1.2;
     const basketY = 7.68;
     const anchorY = 8.62;
@@ -123,8 +140,8 @@ export function PerimeterFoliage({ roomHalf, bookcaseFace, bookcaseWidth, tierY 
         Math.atan2(-position.x, -position.z),
       ),
     }));
-    const basketCords: Array<{ from: Point; to: Point }> = [];
-    const hangingStems: Array<{ from: Point; to: Point }> = [];
+    const basketCords: StemSegmentSpec[] = [];
+    const hangingStems: StemSegmentSpec[] = [];
     const hangingLeaves: PartTransform[] = [];
     const hangingBracts: PartTransform[] = [];
     const hangingCentres: PartTransform[] = [];
@@ -215,7 +232,9 @@ export function PerimeterFoliage({ roomHalf, bookcaseFace, bookcaseWidth, tierY 
     });
 
     return {
-      basketSpecs: baskets,
+      basketPositions: baskets.map(({ position }) => position.toArray()),
+      basketRimPositions: baskets.map(({ position }) => position.clone().add(new THREE.Vector3(0, 0.12, 0)).toArray()),
+      basketSoilPositions: baskets.map(({ position }) => position.clone().add(new THREE.Vector3(0, 0.152, 0)).toArray()),
       cords: basketCords,
       stems: hangingStems,
       leaves: hangingLeaves,
@@ -227,22 +246,38 @@ export function PerimeterFoliage({ roomHalf, bookcaseFace, bookcaseWidth, tierY 
   }, [bookcaseFace, bookcaseWidth, roomHalf, tierY]);
 
   return <group>
-    {basketSpecs.map(({ position }, index) => <group key={`basket-${index}`} position={position}>
-      <mesh castShadow receiveShadow>
-        <cylinderGeometry args={[0.28, 0.2, 0.28, 12]} />
-        <meshStandardMaterial color="#a96c51" roughness={0.94} />
-      </mesh>
-      <mesh position={[0, 0.12, 0]} castShadow>
-        <cylinderGeometry args={[0.295, 0.295, 0.055, 12]} />
-        <meshStandardMaterial color="#c18768" roughness={0.92} />
-      </mesh>
-      <mesh position={[0, 0.152, 0]}>
-        <cylinderGeometry args={[0.235, 0.235, 0.018, 12]} />
-        <meshStandardMaterial color="#49392f" roughness={1} />
-      </mesh>
-    </group>)}
-    {cords.map((cord, index) => <StemSegment key={`basket-cord-${index}`} from={cord.from} to={cord.to} radius={0.007} color="#574436" />)}
-    {stems.map((stem, index) => <StemSegment key={`hanging-stem-${index}`} from={stem.from} to={stem.to} radius={0.011} />)}
+    <InstancedCylinders
+      positions={basketPositions}
+      radiusTop={0.28}
+      radiusBottom={0.2}
+      height={0.28}
+      radialSegments={12}
+      color="#a96c51"
+      roughness={0.94}
+      castShadow
+      receiveShadow
+    />
+    <InstancedCylinders
+      positions={basketRimPositions}
+      radiusTop={0.295}
+      radiusBottom={0.295}
+      height={0.055}
+      radialSegments={12}
+      color="#c18768"
+      roughness={0.92}
+      castShadow
+    />
+    <InstancedCylinders
+      positions={basketSoilPositions}
+      radiusTop={0.235}
+      radiusBottom={0.235}
+      height={0.018}
+      radialSegments={12}
+      color="#49392f"
+      roughness={1}
+    />
+    <InstancedStemSegments segments={cords} radius={0.007} color="#574436" />
+    <InstancedStemSegments segments={stems} radius={0.011} />
     <InstancedFlatParts transforms={leaves} />
     <InstancedFlatParts transforms={bracts} />
     <InstancedRoundParts transforms={centres} />
