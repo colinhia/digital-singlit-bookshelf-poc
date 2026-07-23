@@ -154,6 +154,31 @@ function locationLabel(location: MyLibrarySelection["location"]) {
   return "COMPLETED COLLECTION";
 }
 
+function ExplainerPanel({ title, sentences }: { title: string; sentences: string[] }) {
+  return <aside className="explainer-panel" aria-label={`About this action: ${title}`}>
+    <p className="explainer-label">ABOUT THIS ACTION</p>
+    <h3>{title}</h3>
+    {sentences.map((sentence) => <p key={sentence}>{sentence}</p>)}
+  </aside>;
+}
+
+function GuidedDialog({
+  children,
+  size,
+  title,
+  sentences,
+}: {
+  children: React.ReactNode;
+  size: "catalogue" | "wide" | "compact" | "detail";
+  title: string;
+  sentences: string[];
+}) {
+  return <div className={`guided-dialog-layout is-${size}`}>
+    {children}
+    <ExplainerPanel title={title} sentences={sentences} />
+  </div>;
+}
+
 export default function MyLibrary({ books }: { books: Book[] }) {
   const [role, setRole] = useState<MyLibraryRole | null>(null);
   const [library, setLibrary] = useState<CuratedLibraryState>(EMPTY_LIBRARY);
@@ -236,6 +261,37 @@ export default function MyLibrary({ books }: { books: Book[] }) {
   const selectedAppearance = selection ? resolveBookAppearance(selection.book) : null;
   const selectedReview = selection ? reviews[selection.book.serialNumber] : undefined;
   const framePhoto = PHOTO_OPTIONS.find((photo) => photo.id === framePhotoId) ?? null;
+  const infoExplainer = role === "visitor"
+    ? {
+      title: "Visit a shared library",
+      sentences: [
+        "Read the owner’s book details and reviews.",
+        "Visitor mode does not allow changes.",
+      ],
+    }
+    : selection?.location === "reading-list"
+      ? {
+        title: "Choose what comes next",
+        sentences: [
+          "Move this book to the reading table when you start it.",
+          "You can also mark it as completed.",
+        ],
+      }
+      : selection?.location === "currently-reading"
+        ? {
+          title: "Finish your current read",
+          sentences: [
+            "This book is on your reading table.",
+            "Move it to completed when you finish.",
+          ],
+        }
+        : {
+          title: "Manage a completed book",
+          sentences: [
+            "View or edit the review saved with this book.",
+            "You can also remove it from this demo library.",
+          ],
+        };
 
   useEffect(() => {
     const media = window.matchMedia("(pointer: coarse)");
@@ -562,11 +618,11 @@ export default function MyLibrary({ books }: { books: Book[] }) {
         <div className="role-options">
           <button ref={ownerRoleRef} type="button" onClick={() => chooseRole("owner")}>
             <strong>Enter as Owner</strong>
-            <span>Start empty and curate your own reading space.</span>
+            <span>Add what you’re reading, curate your space, and share reviews.</span>
           </button>
           <button type="button" onClick={() => chooseRole("visitor")}>
             <strong>Enter as Visitor</strong>
-            <span>Explore a populated demonstration without making changes.</span>
+            <span>Visit someone else’s library and browse their books and reviews without making changes.</span>
           </button>
         </div>
         <Link className="role-home-link" href="/">← Back to home</Link>
@@ -574,6 +630,14 @@ export default function MyLibrary({ books }: { books: Book[] }) {
     </div>}
 
     {mode === "catalogue" && <div className="backdrop" role="presentation">
+      <GuidedDialog
+        size="catalogue"
+        title="Build your reading list"
+        sentences={[
+          "Search the shared SingLit catalogue.",
+          "Add books you want to read to the small shelf.",
+        ]}
+      >
       <article className="catalogue-panel" role="dialog" aria-modal="true" aria-labelledby="catalogue-title">
         <button className="close" type="button" onClick={closeOverlay} aria-label="Close catalogue">×</button>
         <p className="eyebrow">OWNER MODE</p>
@@ -635,9 +699,18 @@ export default function MyLibrary({ books }: { books: Book[] }) {
           onClick={() => setVisibleCatalogueCount((count) => count + 50)}
         >Show 50 more</button>}
       </article>
+      </GuidedDialog>
     </div>}
 
     {mode === "photo-picker" && role === "owner" && <div className="backdrop" role="presentation">
+      <GuidedDialog
+        size="wide"
+        title="Personalize the wall"
+        sentences={[
+          "Choose an image for the frame above your reading-list shelf.",
+          "The image lasts for this visit.",
+        ]}
+      >
       <article className="photo-picker" role="dialog" aria-modal="true" aria-labelledby="photo-picker-title">
         <button ref={photoPickerCloseRef} className="close" type="button" onClick={closeOverlay} aria-label="Close picture picker">×</button>
         <p className="eyebrow">OWNER MODE</p>
@@ -667,9 +740,18 @@ export default function MyLibrary({ books }: { books: Book[] }) {
           disabled={framePhotoId === null}
         >Clear frame</button>
       </article>
+      </GuidedDialog>
     </div>}
 
     {mode === "flower-picker" && role === "owner" && <div className="backdrop" role="presentation">
+      <GuidedDialog
+        size="wide"
+        title="Style the flower troughs"
+        sentences={[
+          "Choose one flower style for both troughs.",
+          "The flowers last for this visit.",
+        ]}
+      >
       <article className="photo-picker flower-picker" role="dialog" aria-modal="true" aria-labelledby="flower-picker-title">
         <button ref={flowerPickerCloseRef} className="close" type="button" onClick={closeOverlay} aria-label="Close flower picker">×</button>
         <p className="eyebrow">OWNER MODE</p>
@@ -692,9 +774,23 @@ export default function MyLibrary({ books }: { books: Book[] }) {
           </button>)}
         </div>
       </article>
+      </GuidedDialog>
     </div>}
 
     {mode === "review" && role === "owner" && reviewIntent && <div className="backdrop" role="presentation">
+      <GuidedDialog
+        size="compact"
+        title={reviewIntent.kind === "edit" ? "Update your review" : "Record a finished read"}
+        sentences={reviewIntent.kind === "edit"
+          ? [
+            "Change the rating or comment saved with this book.",
+            "The update lasts for this visit.",
+          ]
+          : [
+            "Rate the book before moving it to completed.",
+            "Add a short comment if you want to remember more.",
+          ]}
+      >
       <article className="review-dialog" role="dialog" aria-modal="true" aria-labelledby="review-dialog-title">
         <button ref={reviewCloseRef} className="close" type="button" onClick={cancelReview} aria-label="Cancel review">×</button>
         <p className="eyebrow">{reviewIntent.kind === "edit" ? "EDIT REVIEW" : "FINISH READING"}</p>
@@ -732,9 +828,15 @@ export default function MyLibrary({ books }: { books: Book[] }) {
           </div>
         </form>
       </article>
+      </GuidedDialog>
     </div>}
 
     {mode === "info" && selection && selectedAppearance && <div className="backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && closeOverlay()}>
+      <GuidedDialog
+        size="detail"
+        title={infoExplainer.title}
+        sentences={infoExplainer.sentences}
+      >
       <article className="detail" role="dialog" aria-modal="true" aria-labelledby="my-library-book-dialog-title">
         <button ref={infoCloseRef} className="close" type="button" onClick={closeOverlay} aria-label="Close book details">×</button>
         <div className="detail-cover" style={{
@@ -784,6 +886,7 @@ export default function MyLibrary({ books }: { books: Book[] }) {
           </div> : <p className="read-only-note">Visitor mode · information only</p>}
         </div>
       </article>
+      </GuidedDialog>
     </div>}
 
     <div className="sr-collection" aria-label="Books in My Library">
