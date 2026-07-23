@@ -135,9 +135,9 @@ dl { margin-top:38px; border-top:1px solid #d5d1cd; } dl div { display:grid; gri
   .role-card { padding:30px 22px; box-shadow:8px 8px 0 var(--peach); }.role-options { grid-template-columns:1fr; }.role-options button { min-height:116px; }.catalogue-panel,.photo-picker,.review-dialog { padding:38px 22px 24px; }.catalogue-status { align-items:flex-start; flex-direction:column; gap:5px; }.catalogue-results li { grid-template-columns:1fr; }.catalogue-results li button { width:100%; }.photo-picker-grid { grid-template-columns:1fr; }.review-dialog-actions { display:grid; }.review-dialog-actions button { width:100%; }
 }
 @media(max-width:800px){
-  .guided-dialog-layout { display:block; max-height:90dvh; overflow-x:hidden; overflow-y:auto; }
+  .guided-dialog-layout { display:flex; flex-direction:column; max-height:90dvh; overflow-x:hidden; overflow-y:auto; }
   .guided-dialog-layout>article { max-height:none; overflow-x:hidden; overflow-y:visible; }
-  .explainer-panel { margin-top:14px; }
+  .explainer-panel { order:-1; margin-bottom:14px; }
 }
 @media(prefers-reduced-motion:reduce){
   .shell-option,.hud-panel,.target-card { transition:none; }
