@@ -2,7 +2,7 @@
 
 import { PointerLockControls } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
-import { memo, useCallback, useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { PointerLockControls as PointerLockControlsImpl } from "three-stdlib";
 import type { Book, BookSelection, RoomControlsHandle } from "@/types/library";
@@ -13,6 +13,7 @@ import BookCollection from "@/experiences/singlit/BookCollection";
 import RoomCentrepiece from "@/components/scene-assets/RoomCentrepiece";
 import { EntranceFoliage, PerimeterFoliage } from "@/components/scene-assets/EntranceFoliage";
 import { VintageGate } from "@/components/scene-assets/VintageGate";
+import { StaticShadowMap } from "@/components/scene-assets/StaticShadowMap";
 import {
   BOOKCASE_FACE,
   BOOKCASE_WIDTH,
@@ -73,7 +74,13 @@ function CameraRig({ mobile, onSelect, target, onControlsReady, onLock, onUnlock
 }
 
 function Scene({ books, tableBooks, matchingSerials, mobile, onSelect, onTarget, target, onControlsReady, onLock, onUnlock }: { books: Book[]; tableBooks: Book[]; matchingSerials: Set<number>; mobile: boolean; onSelect: (selection: BookSelection) => void; onTarget: (selection: BookSelection | null) => void; target: BookSelection | null; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
+  const shadowRevision = useMemo(
+    () => ({ matchingSerials, tableBooks }),
+    [matchingSerials, tableBooks],
+  );
+
   return <>
+    <StaticShadowMap enabled={!mobile} revision={shadowRevision} />
     <RoomEnvironment />
     <VintageGate position={[0, 0, ROOM_HALF - 0.33]} />
     <EntranceFoliage position={[0, 0, ROOM_HALF - 0.62]} />
@@ -102,6 +109,8 @@ function RoomScene({ books, tableBooks, matchingSerials, onSelect, onTarget, tar
     gl.setClearColor(ROOM_WALL_COLOR);
     gl.shadowMap.enabled = !mobile;
     gl.shadowMap.type = THREE.PCFSoftShadowMap;
+    gl.shadowMap.autoUpdate = false;
+    gl.shadowMap.needsUpdate = !mobile;
   }, [mobile]);
   return <Canvas camera={{ position:[0,CAMERA_HEIGHT,0.7], fov:68, near:0.1, far:40 }} dpr={mobile ? [1,1.25] : [1,1.7]} frameloop="demand" shadows={!mobile} onCreated={handleCreated} gl={{ antialias:true, powerPreference:"high-performance" }}>
     <Scene books={books} tableBooks={tableBooks} matchingSerials={matchingSerials} mobile={mobile} onSelect={onSelect} onTarget={onTarget} target={target} onControlsReady={onControlsReady} onLock={onLock} onUnlock={onUnlock} />

@@ -2,7 +2,7 @@
 
 import { PointerLockControls } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
-import { memo, useCallback, useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { PointerLockControls as PointerLockControlsImpl } from "three-stdlib";
 import type { RoomControlsHandle } from "@/types/library";
@@ -24,6 +24,7 @@ import {
 import type { MyLibraryTarget } from "@/experiences/mylibrary/types";
 import type { PhotoOption } from "@/experiences/mylibrary/photoOptions";
 import CuratedBooks from "@/experiences/mylibrary/CuratedBooks";
+import { StaticShadowMap } from "@/components/scene-assets/StaticShadowMap";
 
 const CAMERA_HEIGHT = 3.53;
 const MOBILE_MIN_PITCH = -0.72;
@@ -111,7 +112,23 @@ function CameraRig({
 }
 
 function Scene(props: MyLibraryRoomSceneProps) {
+  const shadowRevision = useMemo(
+    () => ({
+      completedBooks: props.completedBooks,
+      currentlyReadingBook: props.currentlyReadingBook,
+      flowerVariant: props.flowerVariant,
+      readingListBooks: props.readingListBooks,
+    }),
+    [
+      props.completedBooks,
+      props.currentlyReadingBook,
+      props.flowerVariant,
+      props.readingListBooks,
+    ],
+  );
+
   return <>
+    <StaticShadowMap enabled={!props.mobile} revision={shadowRevision} />
     <RoomEnvironment />
     <VintageGate position={[0, 0, ROOM_HALF - 0.33]} />
     <Bookcase wall="rear" />
@@ -168,6 +185,8 @@ function RoomScene(props: MyLibraryRoomSceneProps) {
     gl.setClearColor(ROOM_WALL_COLOR);
     gl.shadowMap.enabled = !props.mobile;
     gl.shadowMap.type = THREE.PCFSoftShadowMap;
+    gl.shadowMap.autoUpdate = false;
+    gl.shadowMap.needsUpdate = !props.mobile;
   }, [props.mobile]);
 
   return <Canvas
