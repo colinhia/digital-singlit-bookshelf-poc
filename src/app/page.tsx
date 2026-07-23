@@ -10,13 +10,13 @@ export default function Home() {
         <Link className="shell-option" href="/collection" prefetch={false}>
           <span className="shell-option-number">01</span>
           <strong>Enter the SingLit Collection</strong>
-          <small>Explore Singapore literature across four languages.</small>
+          <small>Explore Singapore literature across four languages, inspired by the Criterion Collection Closet.</small>
           <span className="shell-option-arrow" aria-hidden="true">→</span>
         </Link>
         <Link className="shell-option" href="/my-library" prefetch={false}>
           <span className="shell-option-number">02</span>
           <strong>Enter My Library</strong>
-          <small>Curate a personal collection and reading space.</small>
+          <small>Curate and share your reads in a digital library space, then visit others.</small>
           <span className="shell-option-arrow" aria-hidden="true">→</span>
         </Link>
       </div>

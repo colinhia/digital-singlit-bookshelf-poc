@@ -562,11 +562,11 @@ export default function MyLibrary({ books }: { books: Book[] }) {
         <div className="role-options">
           <button ref={ownerRoleRef} type="button" onClick={() => chooseRole("owner")}>
             <strong>Enter as Owner</strong>
-            <span>Start empty and curate your own reading space.</span>
+            <span>Add what you’re reading, curate your space, and share reviews.</span>
           </button>
           <button type="button" onClick={() => chooseRole("visitor")}>
             <strong>Enter as Visitor</strong>
-            <span>Explore a populated demonstration without making changes.</span>
+            <span>Visit someone else’s library and browse their books and reviews without making changes.</span>
           </button>
         </div>
         <Link className="role-home-link" href="/">← Back to home</Link>
