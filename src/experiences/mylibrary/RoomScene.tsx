@@ -2,7 +2,7 @@
 
 import { PointerLockControls } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
-import { useCallback, useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useRef } from "react";
 import * as THREE from "three";
 import type { PointerLockControls as PointerLockControlsImpl } from "three-stdlib";
 import type { RoomControlsHandle } from "@/types/library";
@@ -163,7 +163,7 @@ interface MyLibraryRoomSceneProps {
   onUnlock: () => void;
 }
 
-export default function RoomScene(props: MyLibraryRoomSceneProps) {
+function RoomScene(props: MyLibraryRoomSceneProps) {
   const handleCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
     gl.setClearColor(ROOM_WALL_COLOR);
     gl.shadowMap.enabled = !props.mobile;
@@ -181,3 +181,5 @@ export default function RoomScene(props: MyLibraryRoomSceneProps) {
     <Scene {...props} />
   </Canvas>;
 }
+
+export default memo(RoomScene);

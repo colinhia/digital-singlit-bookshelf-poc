@@ -2,7 +2,7 @@
 
 import { PointerLockControls } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef } from "react";
 import * as THREE from "three";
 import type { PointerLockControls as PointerLockControlsImpl } from "three-stdlib";
 import type { Book, BookSelection, RoomControlsHandle } from "@/types/library";
@@ -97,7 +97,7 @@ function Scene({ books, tableBooks, matchingSerials, mobile, onSelect, onTarget,
   </>;
 }
 
-export default function RoomScene({ books, tableBooks, matchingSerials, onSelect, onTarget, target, mobile, onControlsReady, onLock, onUnlock }: { books: Book[]; tableBooks: Book[]; matchingSerials: Set<number>; onSelect: (selection: BookSelection) => void; onTarget: (selection: BookSelection | null) => void; target: BookSelection | null; mobile: boolean; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
+function RoomScene({ books, tableBooks, matchingSerials, onSelect, onTarget, target, mobile, onControlsReady, onLock, onUnlock }: { books: Book[]; tableBooks: Book[]; matchingSerials: Set<number>; onSelect: (selection: BookSelection) => void; onTarget: (selection: BookSelection | null) => void; target: BookSelection | null; mobile: boolean; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
   const handleCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
     gl.setClearColor(ROOM_WALL_COLOR);
     gl.shadowMap.enabled = !mobile;
@@ -107,3 +107,5 @@ export default function RoomScene({ books, tableBooks, matchingSerials, onSelect
     <Scene books={books} tableBooks={tableBooks} matchingSerials={matchingSerials} mobile={mobile} onSelect={onSelect} onTarget={onTarget} target={target} onControlsReady={onControlsReady} onLock={onLock} onUnlock={onUnlock} />
   </Canvas>;
 }
+
+export default memo(RoomScene);

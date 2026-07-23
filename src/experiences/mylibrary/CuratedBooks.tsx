@@ -52,6 +52,7 @@ import type {
 } from "@/experiences/mylibrary/types";
 
 const COMPLETED_SLOTS_PER_TIER = 25;
+const CENTER_POINTER = new THREE.Vector2(0, 0);
 
 interface CuratedShelfItem {
   book: Book;
@@ -283,11 +284,14 @@ export default function CuratedBooks({
   const targetIndexRef = useRef<number | null>(null);
   const { camera, invalidate } = useThree();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const raycastTargetsRef = useRef<THREE.Object3D[]>([]);
+  const intersectionsRef = useRef<THREE.Intersection[]>([]);
+  const coverColorRef = useRef(new THREE.Color());
   const geometries = useBookGeometries();
   const instanceCapacity = Math.max(1, items.length);
 
   const setCoverColor = (index: number, value: string) => {
-    const color = new THREE.Color(value);
+    const color = coverColorRef.current.set(value);
     spineRef.current?.setColorAt(index, color);
     boardsRef.current?.setColorAt(index * 2, color);
     boardsRef.current?.setColorAt(index * 2 + 1, color);
@@ -352,12 +356,18 @@ export default function CuratedBooks({
     const spine = spineRef.current;
     const shelfTarget = readingShelfRef.current;
     if (!spine || !shelfTarget) return;
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-    const targets: THREE.Object3D[] = [spine, shelfTarget];
+    raycaster.setFromCamera(CENTER_POINTER, camera);
+    const targets = raycastTargetsRef.current;
+    targets.length = 0;
+    targets.push(spine, shelfTarget);
     if (tableRef.current) targets.push(tableRef.current);
     if (frameEditable && pictureFrameRef.current) targets.push(pictureFrameRef.current);
     if (flowerEditable) flowerTroughRefs.current.forEach((trough) => trough && targets.push(trough));
-    const hit = raycaster.intersectObjects(targets, true)[0];
+    const intersections = intersectionsRef.current;
+    intersections.length = 0;
+    raycaster.intersectObjects(targets, true, intersections);
+    const hit = intersections[0];
+    intersections.length = 0;
     let nextIndex: number | null = null;
     let next: MyLibraryTarget | null = null;
     if (hit?.object === spine && hit.instanceId !== undefined) {

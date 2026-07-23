@@ -30,6 +30,8 @@ import {
 import type { BookVisualData } from "@/components/scene-assets/books/types";
 import { resolveTopDownTierY } from "@/components/scene-assets/roomLayout";
 
+const CENTER_POINTER = new THREE.Vector2(0, 0);
+
 interface BookRenderConfig {
   shelfWidth: number;
   bookFace: number;
@@ -257,10 +259,13 @@ function RealisticBooks({ items, tableBooks, matchingSerials, config, onSelect, 
   const targetIndexRef = useRef<number | null>(null);
   const { camera, invalidate } = useThree();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const raycastTargetsRef = useRef<THREE.Object3D[]>([]);
+  const intersectionsRef = useRef<THREE.Intersection[]>([]);
+  const coverColorRef = useRef(new THREE.Color());
   const geometries = useBookGeometries();
 
   const setCoverColor = (index: number, value: string) => {
-    const color = new THREE.Color(value);
+    const color = coverColorRef.current.set(value);
     matchingSpineRef.current?.setColorAt(index, color);
     matchingBoardsRef.current?.setColorAt(index * 2, color);
     matchingBoardsRef.current?.setColorAt(index * 2 + 1, color);
@@ -342,10 +347,16 @@ function RealisticBooks({ items, tableBooks, matchingSerials, config, onSelect, 
     const matchingSpine = matchingSpineRef.current;
     const filteredSpine = filteredSpineRef.current;
     if (!matchingSpine || !filteredSpine) return;
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-    const targets: THREE.Object3D[] = [matchingSpine, filteredSpine];
+    raycaster.setFromCamera(CENTER_POINTER, camera);
+    const targets = raycastTargetsRef.current;
+    targets.length = 0;
+    targets.push(matchingSpine, filteredSpine);
     if (tableGroupRef.current) targets.push(tableGroupRef.current);
-    const hit = raycaster.intersectObjects(targets, true)[0];
+    const intersections = intersectionsRef.current;
+    intersections.length = 0;
+    raycaster.intersectObjects(targets, true, intersections);
+    const hit = intersections[0];
+    intersections.length = 0;
     let nextIndex: number | null = null;
     let next: BookSelection | null = null;
     if (hit?.object === matchingSpine && hit.instanceId !== undefined) {
