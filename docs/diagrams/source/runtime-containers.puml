@@ -1,0 +1,51 @@
+@startuml
+' Evidence: src/app/collection/page.tsx and src/app/my-library/page.tsx
+' Evidence: src/data/books.ts (getBooks)
+' Evidence: src/experiences/singlit/Library.tsx and src/experiences/mylibrary/MyLibrary.tsx
+' Evidence: both RoomScene.tsx modules (client-only Canvas and WebGL)
+!include _theme.iuml
+
+title Current runtime containers and boundaries
+left to right direction
+skinparam linetype ortho
+
+actor "Browser user" as User
+
+node "Next.js server runtime" as Server {
+  component "Dynamic room page\nServer Component" as Page
+  component "getBooks adapter" as Adapter
+}
+
+database "Neon\nbooks" as Neon
+
+node "Browser" as Browser {
+  component "Hydrated experience controller\nLibrary or MyLibrary" as Controller
+  component "DOM overlays\nfilters, details, catalogue,\nreviews and controls" as Overlays
+  component "Dynamically imported RoomScene\nSSR disabled" as Scene
+  component "React Three Fiber Canvas" as Canvas
+  component "Three.js / WebGL renderer" as WebGL
+  component "Visit-scoped React state" as State
+}
+
+cloud "Vercel Analytics" as Analytics
+
+User --> Page : GET /collection\nor /my-library
+Page --> Adapter : await getBooks()
+Adapter --> Neon : SELECT ordered rows
+Neon --> Adapter : BookRow[]
+Adapter --> Page : Book[]
+Page --> Controller : serialized Book[] props
+Controller --> State : own modes, filters,\nselections and curation
+Controller --> Overlays : render DOM UI
+Controller --> Scene : dynamic client import\nand scene props
+Scene --> Canvas
+Canvas --> WebGL
+User --> Overlays : keyboard, click, tap
+User --> WebGL : pointer movement,\ndrag and selection
+Overlays --> Analytics : root integration present
+
+note bottom of State
+  No localStorage, cookie or server write.
+  Reloading discards visit changes.
+end note
+@enduml

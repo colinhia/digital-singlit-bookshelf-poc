@@ -1,0 +1,42 @@
+@startuml
+' Evidence: src/app/collection/page.tsx and src/app/my-library/page.tsx
+' Evidence: src/data/books.ts (BookRow and getBooks)
+' Evidence: both experience controllers' dynamic RoomScene imports and WebGL checks
+!include _theme.iuml
+
+title Catalogue-backed room request sequence
+
+actor User
+participant "Browser" as Browser
+participant "Next.js dynamic\nServer Component" as Page
+participant "getBooks" as Adapter
+database "Neon books" as Neon
+participant "Client experience\nLibrary / MyLibrary" as Controller
+participant "Dynamic RoomScene\nSSR disabled" as Scene
+participant "React Three Fiber\nCanvas" as Canvas
+
+User -> Browser : Navigate to /collection or /my-library
+Browser -> Page : GET route
+Page -> Adapter : await getBooks()
+
+alt DATABASE_URL is absent
+  Adapter --> Page : throw configuration error
+  Page --> Browser : framework error handling
+else connection string exists
+  Adapter -> Neon : SELECT seven catalogue columns\nORDER BY serial_number ASC
+  Neon --> Adapter : BookRow[]
+  Adapter -> Adapter : map snake_case rows\nto camelCase Book[]
+  Adapter --> Page : Book[]
+  Page --> Browser : server output with controller props
+  Browser -> Controller : hydrate with Book[]
+  Controller -> Controller : derive filters, lists and\nvisit-scoped initial state
+  Controller -> Scene : load client chunk
+  Scene -> Scene : test WebGL capability
+  alt WebGL available
+    Scene -> Canvas : mount demand-driven scene
+    Canvas --> Browser : render room
+  else no WebGL
+    Controller --> Browser : render DOM fallback
+  end
+end
+@enduml

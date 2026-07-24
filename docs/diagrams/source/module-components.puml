@@ -1,0 +1,90 @@
+@startuml
+' Evidence: imports throughout src/app, src/data, src/experiences and src/components
+' Evidence: src/components/room-decor/archive/README.md
+!include _theme.iuml
+
+title Active code component view
+top to bottom direction
+skinparam linetype ortho
+
+package "App Router" as Routes {
+  [Root layout\n+ Analytics] as RootLayout
+  [Static home page] as HomePage
+  [/collection\nserver page] as CollectionPage
+  [/my-library\nserver page] as MyLibraryPage
+  [Route-scoped\nfont layouts] as FontLayouts
+}
+
+package "Data and domain" as Data {
+  [getBooks] as GetBooks
+  [Shared library types] as SharedTypes
+  [Bookshelf, room and\nplacement configuration] as RoomData
+}
+
+package "SingLit experience" as SingLit {
+  [Library controller] as Library
+  [SingLit RoomScene] as SinglitScene
+  [BookCollection] as BookCollection
+}
+
+package "My Library experience" as Personal {
+  [MyLibrary controller] as MyLibrary
+  [My Library RoomScene] as MyScene
+  [CuratedBooks] as CuratedBooks
+  [My Library types,\nlayout and photo options] as MyConfig
+}
+
+package "Shared scene assets" as SceneAssets {
+  [Room environment,\nsurfaces and lighting] as Environment
+  [Furniture, bookcases,\ngate and botanicals] as Assets
+  [Book geometry, appearance,\nstack and spine typography] as BookAssets
+  [StaticShadowMap] as Shadows
+}
+
+package "Archived, inactive" as Archived {
+  [DragonPlayground registry] as Archive
+}
+
+RootLayout --> HomePage
+RootLayout --> CollectionPage
+RootLayout --> MyLibraryPage
+FontLayouts --> CollectionPage
+FontLayouts --> MyLibraryPage
+
+CollectionPage --> GetBooks
+CollectionPage --> Library
+MyLibraryPage --> GetBooks
+MyLibraryPage --> MyLibrary
+GetBooks --> SharedTypes
+RoomData --> SharedTypes
+
+Library --> SinglitScene
+SinglitScene --> BookCollection
+Library --> RoomData
+
+MyLibrary --> MyScene
+MyScene --> CuratedBooks
+MyLibrary --> MyConfig
+CuratedBooks --> MyConfig
+
+SinglitScene --> Environment
+SinglitScene --> Assets
+SinglitScene --> Shadows
+BookCollection --> BookAssets
+MyScene --> Environment
+MyScene --> Assets
+MyScene --> Shadows
+CuratedBooks --> BookAssets
+
+Routes -[hidden]down-> Data
+Data -[hidden]down-> SingLit
+SingLit -[hidden]right-> Personal
+SingLit -[hidden]down-> SceneAssets
+Archived -[hidden]right-> SceneAssets
+
+note bottom of Archive
+  Maintained and type-checked,
+  but not imported by either
+  active room composition.
+end note
+@enduml

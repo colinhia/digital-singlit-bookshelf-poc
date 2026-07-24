@@ -1,0 +1,30 @@
+@startuml
+' Evidence: src/app/my-library/page.tsx (MyLibraryPage)
+' Evidence: src/experiences/mylibrary/MyLibrary.tsx (visitorLibrary, chooseRole, openTarget and mutation handlers)
+' Evidence: src/experiences/mylibrary/photoOptions.ts (photo choices)
+!include _theme.iuml
+
+title My Library activity flow
+
+start
+:Open My Library;
+:Choose Owner or Visitor;
+
+if (Owner?) then (yes)
+  :Explore an empty personal room;
+  if (Choose an activity) then (Books)
+    :Browse the catalogue;
+    :Add a book or manage its reading progress;
+    :Write or edit a review;
+  else (Personalize)
+    :Choose the framed photo or flowers;
+  endif
+else (Visitor)
+  :Explore the populated example room;
+  :Select a book;
+  :Read its details and example review;
+endif
+
+:Continue exploring or leave;
+stop
+@enduml

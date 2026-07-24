@@ -1,0 +1,113 @@
+@startuml
+' Evidence: src/types/library.ts
+' Evidence: src/experiences/mylibrary/types.ts
+' Evidence: src/components/scene-assets/books/bookVisuals.ts and bookAppearance.ts
+!include _theme.iuml
+
+title Current application domain model
+top to bottom direction
+hide methods
+
+class Book {
+  serialNumber: number
+  language: Chinese | English | Tamil | Malay
+  barcode: string
+  title: string
+  author: string
+  locationCode: string
+  callNumber: string
+}
+
+class Bookshelf {
+  id: string
+  name: string
+  description: string
+  capacity: number
+}
+
+class BookSelection {
+  book: Book
+  location: shelf | table
+}
+
+class RoomLayout {
+  totalCapacity: number
+  walls: BookcaseWall[]
+}
+
+class BookcaseWall {
+  id: left | rear | right
+  capacity: number
+  tiers: number
+  slotsPerTier: number
+}
+
+class BookSlot {
+  slotNumber: number
+  wall: left | rear | right
+  tier: number
+  positionOnTier: number
+}
+
+class BookRenderProfile {
+  serialNumber: number
+  binding: hardcover | paperback
+  width: number
+  height: number
+  depth: number
+  lean: number
+  coverThickness: number
+  pageInset: number
+}
+
+class MyLibrarySelection {
+  book: Book
+  location: reading-list |
+    currently-reading | completed
+}
+
+class CuratedLibraryState {
+  readingListSerials: number[]
+  currentlyReadingSerial: number | null
+  completedSerials: number[]
+}
+
+class BookReview {
+  rating: number
+  comment: string
+}
+
+class MyLibraryTarget <<discriminated union>> {
+  kind: book | reading-shelf |
+    picture-frame | flower-trough
+  selection?: MyLibrarySelection
+  side?: left | right
+}
+
+BookSelection o-- Book
+MyLibrarySelection o-- Book
+BookRenderProfile .up.> Book : derived from serialNumber
+RoomLayout *-- "3" BookcaseWall
+BookcaseWall ..> BookSlot : defines slot grid
+MyLibraryTarget o-- MyLibrarySelection
+CuratedLibraryState ..> Book : serials resolved against Book[]
+BookReview ..> Book : record keyed by serialNumber
+
+Book -[hidden]right-> Bookshelf
+BookSelection -[hidden]right-> RoomLayout
+RoomLayout -[hidden]right-> BookRenderProfile
+MyLibrarySelection -[hidden]right-> CuratedLibraryState
+CuratedLibraryState -[hidden]right-> BookReview
+
+note right of CuratedLibraryState
+  Stored only in React memory.
+  Serial arrays are mutually managed
+  by the current UI handlers.
+end note
+
+note left of BookRenderProfile
+  Render profile and cover appearance are
+  deterministic derivatives of serialNumber;
+  neither is persisted.
+end note
+@enduml

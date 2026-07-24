@@ -1,0 +1,36 @@
+@startuml
+' Evidence: src/app/collection/page.tsx (CollectionPage)
+' Evidence: src/experiences/singlit/Library.tsx (roomReducer, filtering and table handlers)
+' Evidence: src/experiences/singlit/BookCollection.tsx (RealisticBooks)
+' Evidence: src/data/bookPlacement.ts (TABLE_BOOK_CAPACITY and placement helpers)
+!include _theme.iuml
+
+title SingLit Collection activity flow
+
+start
+:Open the SingLit Collection;
+
+if (Search for a book?) then (yes)
+  :Choose a field and enter a search term;
+  :View the matching books;
+endif
+
+:Enter the room and look around;
+:Aim at and select a book;
+:Read its details;
+
+if (Where is the book?) then (Shelf)
+  if (Add it to the table?) then (yes)
+    :Add the book to the table;
+  endif
+else (Table)
+  if (What next?) then (Return)
+    :Return the book to its shelf;
+  else (Borrow)
+    :Display the borrowing QR screen;
+  endif
+endif
+
+:Continue exploring or leave;
+stop
+@enduml

@@ -1,0 +1,53 @@
+@startuml
+' Evidence: README.md (documented Vercel target)
+' Evidence: src/app/layout.tsx (Analytics)
+' Evidence: src/data/books.ts (DATABASE_URL and Neon)
+' Evidence: public/ and Next.js App Router pages
+' Evidence: no vercel.json or explicit runtime declaration in the repository
+!include _theme.iuml
+
+title Current deployment view
+left to right direction
+skinparam linetype ortho
+
+node "User device" as Device {
+  node "Web browser" as Browser {
+    artifact "HTML, CSS and client bundles" as Bundles
+    artifact "React Three Fiber / Three.js\nWebGL room" as Room
+    artifact "Visit-scoped React state" as State
+  }
+}
+
+node "Vercel\n(documented deployment target)" as Vercel {
+  node "Next.js application runtime\n(no explicit edge/serverless mode configured)" as NextRuntime {
+    artifact "Static / route" as StaticHome
+    artifact "Dynamic /collection route" as CollectionRoute
+    artifact "Dynamic /my-library route" as MyLibraryRoute
+    component "getBooks" as Adapter
+  }
+  folder "Static/public assets\nphotos and QR image" as Public
+}
+
+database "Neon\nPostgreSQL-compatible books table" as Neon
+cloud "Vercel Analytics service" as Analytics
+
+Browser --> Vercel : HTTPS route and asset requests
+Vercel --> Browser : server output and bundles
+CollectionRoute --> Adapter
+MyLibraryRoute --> Adapter
+Adapter -right-> Neon : SELECT catalogue
+Browser --> Analytics : analytics integration
+Browser --> Public : image requests
+Bundles --> Room
+Bundles --> State
+
+note top of Adapter
+  Reads server-only DATABASE_URL.
+  The application issues SELECT only.
+end note
+
+note bottom of Vercel
+  The repository has no provider infrastructure file.
+  Vercel is a documented target, not a code-level requirement.
+end note
+@enduml

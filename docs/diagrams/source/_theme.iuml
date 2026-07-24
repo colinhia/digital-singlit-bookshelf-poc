@@ -1,0 +1,64 @@
+skinparam backgroundColor #FCF8F1
+skinparam defaultFontName Arial
+skinparam defaultFontColor #2F241E
+skinparam ArrowColor #7D4434
+skinparam ArrowThickness 1.2
+skinparam BorderColor #7D4434
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam packageStyle rectangle
+skinparam componentStyle rectangle
+skinparam note {
+  BackgroundColor #FFF2D9
+  BorderColor #B66A45
+  FontColor #3C2B22
+}
+skinparam actor {
+  BackgroundColor #F3D6A6
+  BorderColor #7D4434
+}
+skinparam usecase {
+  BackgroundColor #FFF9EF
+  BorderColor #A65443
+}
+skinparam component {
+  BackgroundColor #FFF9EF
+  BorderColor #7D4434
+}
+skinparam rectangle {
+  BackgroundColor #FFF9EF
+  BorderColor #7D4434
+}
+skinparam database {
+  BackgroundColor #F7E5C5
+  BorderColor #7D4434
+}
+skinparam class {
+  BackgroundColor #FFF9EF
+  BorderColor #7D4434
+  HeaderBackgroundColor #EFCF9D
+}
+skinparam state {
+  BackgroundColor #FFF9EF
+  BorderColor #7D4434
+  StartColor #A65443
+  EndColor #A65443
+}
+skinparam activity {
+  BackgroundColor #FFF9EF
+  BorderColor #7D4434
+  DiamondBackgroundColor #F3D6A6
+  DiamondBorderColor #7D4434
+  StartColor #A65443
+  EndColor #A65443
+}
+skinparam sequence {
+  LifeLineBorderColor #7D4434
+  LifeLineBackgroundColor #FFF9EF
+  ParticipantBorderColor #7D4434
+  ParticipantBackgroundColor #EFCF9D
+  ActorBorderColor #7D4434
+  ActorBackgroundColor #F3D6A6
+  GroupBorderColor #A65443
+  GroupBackgroundColor #FFF2D9
+}

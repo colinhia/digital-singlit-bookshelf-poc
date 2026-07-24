@@ -1,0 +1,37 @@
+@startuml
+' Evidence: src/app/layout.tsx (Vercel Analytics)
+' Evidence: src/app/collection/page.tsx and src/app/my-library/page.tsx (dynamic routes)
+' Evidence: src/data/books.ts (Neon read)
+' Evidence: src/experiences/singlit/Library.tsx and public/NLBMobile_QR.png (out-of-band QR)
+!include _theme.iuml
+
+title Current system context
+left to right direction
+
+actor "Person using\na web browser" as Person
+
+rectangle "Digital SingLit Bookshelf PoC\nNext.js application" as App {
+  component "Home and DOM interfaces" as DOM
+  component "SingLit and My Library\nWebGL rooms" as Rooms
+}
+
+database "Neon\nbooks table" as Neon
+cloud "Vercel Analytics" as Analytics
+rectangle "NLB mobile app /\nlanding destination" as NLB
+
+Person --> DOM : navigate, filter,\nchoose actions
+Person --> Rooms : look, target,\nselect
+App --> Neon : SELECT catalogue\non each room request
+DOM --> Analytics : analytics integration\nmounted in root layout
+DOM ..> NLB : user may scan\nbundled QR image
+
+note right of Neon
+  The application has no catalogue
+  or personal-library write path.
+end note
+
+note bottom of NLB
+  Out-of-band user action only.
+  There is no runtime NLB API call.
+end note
+@enduml

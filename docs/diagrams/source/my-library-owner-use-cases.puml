@@ -1,0 +1,24 @@
+@startuml
+' Evidence: src/experiences/mylibrary/MyLibrary.tsx (owner targets and mutation handlers)
+' Evidence: src/experiences/mylibrary/photoOptions.ts (photo choices)
+!include _theme.iuml
+
+title What a My Library Owner can do
+left to right direction
+
+actor "My Library\nOwner" as Owner
+
+rectangle "Owner room" {
+  usecase "Browse and add books" as Add
+  usecase "Manage reading progress" as Progress
+  usecase "Write or edit reviews" as Reviews
+  usecase "Choose the framed photo" as Photo
+  usecase "Choose the flowers" as Flowers
+}
+
+Owner --> Add
+Owner --> Progress
+Owner --> Reviews
+Owner --> Photo
+Owner --> Flowers
+@enduml

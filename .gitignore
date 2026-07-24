@@ -6,4 +6,5 @@ node_modules/
 ~$*.xlsx
 .vercel
 .env*
+!.env.example
 scripts/.books-import.json

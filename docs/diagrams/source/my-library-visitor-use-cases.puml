@@ -1,0 +1,19 @@
+@startuml
+' Evidence: src/experiences/mylibrary/MyLibrary.tsx (visitorLibrary, visitorReviews and owner guards)
+!include _theme.iuml
+
+title What a My Library Visitor can do
+left to right direction
+
+actor "My Library\nVisitor" as Visitor
+
+rectangle "Visitor room" {
+  usecase "Look around the room" as Explore
+  usecase "Read book details" as Details
+  usecase "Read example reviews" as Reviews
+}
+
+Visitor --> Explore
+Visitor --> Details
+Visitor --> Reviews
+@enduml
