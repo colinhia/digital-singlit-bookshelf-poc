@@ -6,13 +6,21 @@ import {
   InstancedFlatParts,
   InstancedLeafParts,
   InstancedRoundParts,
-  StemSegment,
+  InstancedStemSegments,
   type PartTransform,
   type Point,
+  type StemSegmentSpec,
 } from "@/components/scene-assets/BotanicalPrimitives";
 
 const LEAF_COLORS = ["#31563a", "#416840", "#557846"];
 const ORCHID_PETAL_COLORS = ["#d99ad8", "#ca86cd", "#e2a8df"];
+function stemSegments(paths: Point[][]): StemSegmentSpec[] {
+  return paths.flatMap((path) => path.slice(0, -1).map((from, index) => ({
+    from,
+    to: path[index + 1],
+  })));
+}
+
 const ORCHID_STEMS: Point[][] = [
   [[-0.32, 0.43, -0.01], [-0.34, 0.9, -0.02], [-0.4, 1.38, -0.03]],
   [[-0.16, 0.43, 0], [-0.19, 0.98, -0.01], [-0.16, 1.55, -0.02]],
@@ -20,6 +28,7 @@ const ORCHID_STEMS: Point[][] = [
   [[0.16, 0.43, 0], [0.2, 0.9, -0.01], [0.25, 1.4, -0.03]],
   [[0.32, 0.43, -0.01], [0.36, 0.82, 0], [0.4, 1.27, -0.02]],
 ];
+const ORCHID_STEM_SEGMENTS = stemSegments(ORCHID_STEMS);
 
 export type FlowerVariant = "empty" | "bougainvillea" | "orchid" | "sunflower";
 
@@ -29,6 +38,7 @@ const BOUGAINVILLEA_STEMS: Point[][] = [
   [[0.08, 0.43, 0], [0.03, 0.82, -0.01], [0.12, 1.22, -0.02]],
   [[0.28, 0.43, 0], [0.24, 0.72, -0.01], [0.32, 1.06, -0.02]],
 ];
+const BOUGAINVILLEA_STEM_SEGMENTS = stemSegments(BOUGAINVILLEA_STEMS);
 
 const SUNFLOWER_STEMS: Point[][] = [
   [[-0.27, 0.43, 0], [-0.28, 0.85, -0.01], [-0.3, 1.25, -0.02]],
@@ -36,6 +46,7 @@ const SUNFLOWER_STEMS: Point[][] = [
   [[0.1, 0.43, 0], [0.08, 0.9, -0.01], [0.12, 1.38, -0.02]],
   [[0.28, 0.43, 0], [0.25, 0.78, -0.01], [0.3, 1.17, -0.02]],
 ];
+const SUNFLOWER_STEM_SEGMENTS = stemSegments(SUNFLOWER_STEMS);
 
 export function PlanterTrough({ highlighted = false }: { highlighted?: boolean }) {
   return <group>
@@ -112,13 +123,11 @@ export function OrchidPlant() {
   }, []);
 
   return <group position={[0, 0.06, 0]}>
-    {ORCHID_STEMS.flatMap((path, pathIndex) => path.slice(0, -1).map((point, index) => <StemSegment
-      key={`orchid-stem-${pathIndex}-${index}`}
-      from={point}
-      to={path[index + 1]}
+    <InstancedStemSegments
+      segments={ORCHID_STEM_SEGMENTS}
       radius={0.009}
       color="#456b42"
-    />))}
+    />
     <InstancedLeafParts transforms={leaves} />
     <InstancedFlatParts transforms={petals} />
     <InstancedFlatParts transforms={lips} />
@@ -167,13 +176,11 @@ function CompactBougainvilleaPlant() {
   }, []);
 
   return <group>
-    {BOUGAINVILLEA_STEMS.flatMap((path, pathIndex) => path.slice(0, -1).map((point, index) => <StemSegment
-      key={`trough-bougainvillea-${pathIndex}-${index}`}
-      from={point}
-      to={path[index + 1]}
+    <InstancedStemSegments
+      segments={BOUGAINVILLEA_STEM_SEGMENTS}
       radius={0.012}
       color="#41633d"
-    />))}
+    />
     <InstancedLeafParts transforms={leaves} />
     <InstancedFlatParts transforms={bracts} />
     <InstancedRoundParts transforms={centres} />
@@ -224,13 +231,11 @@ function SunflowerPlant() {
   }, []);
 
   return <group>
-    {SUNFLOWER_STEMS.flatMap((path, pathIndex) => path.slice(0, -1).map((point, index) => <StemSegment
-      key={`sunflower-${pathIndex}-${index}`}
-      from={point}
-      to={path[index + 1]}
+    <InstancedStemSegments
+      segments={SUNFLOWER_STEM_SEGMENTS}
       radius={0.014}
       color="#496c3e"
-    />))}
+    />
     <InstancedLeafParts transforms={leaves} />
     <InstancedFlatParts transforms={petals} />
     <InstancedRoundParts transforms={outerCentres} />

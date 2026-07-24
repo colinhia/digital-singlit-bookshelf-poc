@@ -59,10 +59,8 @@ const CATALOGUE_FIELDS: Array<{ value: CatalogueField; label: string }> = [
   { value: "callNumber", label: "Call number" },
 ];
 
-function visitorLibrary(books: Book[]): CuratedLibraryState {
-  const serials = [...books]
-    .sort((left, right) => left.serialNumber - right.serialNumber)
-    .map((book) => book.serialNumber);
+function visitorLibrary(sortedBooks: Book[]): CuratedLibraryState {
+  const serials = sortedBooks.map((book) => book.serialNumber);
   return {
     completedSerials: serials.slice(0, 12),
     currentlyReadingSerial: serials[12] ?? null,
@@ -215,6 +213,19 @@ export default function MyLibrary({ books }: { books: Book[] }) {
     () => new Map(books.map((book) => [book.serialNumber, book])),
     [books],
   );
+  const sortedCatalogueBooks = useMemo(
+    () => [...books].sort((left, right) => left.serialNumber - right.serialNumber),
+    [books],
+  );
+  const catalogueSearchIndex = useMemo(
+    () => sortedCatalogueBooks.map((book) => ({
+      title: String(book.title).toLocaleLowerCase(),
+      author: String(book.author).toLocaleLowerCase(),
+      language: String(book.language).toLocaleLowerCase(),
+      callNumber: String(book.callNumber).toLocaleLowerCase(),
+    })),
+    [sortedCatalogueBooks],
+  );
   const resolveSerials = useCallback(
     (serials: number[]) => serials.flatMap((serial) => {
       const book = booksBySerial.get(serial);
@@ -240,12 +251,15 @@ export default function MyLibrary({ books }: { books: Book[] }) {
   ]), [library]);
   const matchingCatalogueBooks = useMemo(() => {
     const term = catalogueQuery.trim().toLocaleLowerCase();
-    return [...books]
-      .sort((left, right) => left.serialNumber - right.serialNumber)
-      .filter((book) => !term || !catalogueField
-        || String(book[catalogueField]).toLocaleLowerCase().includes(term));
-  }, [books, catalogueField, catalogueQuery]);
-  const visibleCatalogueBooks = matchingCatalogueBooks.slice(0, visibleCatalogueCount);
+    if (!term || !catalogueField) return sortedCatalogueBooks;
+    return sortedCatalogueBooks.filter(
+      (_book, index) => catalogueSearchIndex[index][catalogueField].includes(term),
+    );
+  }, [catalogueField, catalogueQuery, catalogueSearchIndex, sortedCatalogueBooks]);
+  const visibleCatalogueBooks = useMemo(
+    () => matchingCatalogueBooks.slice(0, visibleCatalogueCount),
+    [matchingCatalogueBooks, visibleCatalogueCount],
+  );
   const navigationBooks = selection?.location === "reading-list"
     ? readingListBooks
     : selection?.location === "completed"
@@ -350,7 +364,7 @@ export default function MyLibrary({ books }: { books: Book[] }) {
   }, [changeMode]);
 
   const chooseRole = useCallback((nextRole: MyLibraryRole) => {
-    const nextLibrary = nextRole === "visitor" ? visitorLibrary(books) : EMPTY_LIBRARY;
+    const nextLibrary = nextRole === "visitor" ? visitorLibrary(sortedCatalogueBooks) : EMPTY_LIBRARY;
     setRole(nextRole);
     setLibrary(nextLibrary);
     setReviews(nextRole === "visitor" ? visitorReviews(nextLibrary.completedSerials) : {});
@@ -362,7 +376,7 @@ export default function MyLibrary({ books }: { books: Book[] }) {
     setSelection(null);
     setTarget(null);
     changeMode("pause");
-  }, [books, changeMode]);
+  }, [changeMode, sortedCatalogueBooks]);
 
   const setControls = useCallback((controls: RoomControlsHandle | null) => {
     controlsRef.current = controls;
@@ -405,6 +419,27 @@ export default function MyLibrary({ books }: { books: Book[] }) {
     }
     if (!mobile) controlsRef.current?.unlock();
   }, [changeMode, mobile, role]);
+
+  const handleTarget = useCallback((nextTarget: MyLibraryTarget | null) => {
+    setTarget((current) => {
+      if (current?.kind === "book" && nextTarget?.kind === "book"
+        && sameSelection(current.selection, nextTarget.selection)) return current;
+      if (current?.kind === "flower-trough" && nextTarget?.kind === "flower-trough"
+        && current.side === nextTarget.side) return current;
+      if (current?.kind === nextTarget?.kind
+        && current?.kind !== "book"
+        && current?.kind !== "flower-trough") return current;
+      return nextTarget;
+    });
+  }, []);
+
+  const handleRoomLock = useCallback(() => {
+    changeMode("moving");
+  }, [changeMode]);
+
+  const handleRoomUnlock = useCallback(() => {
+    if (modeRef.current === "moving") changeMode("pause");
+  }, [changeMode]);
 
   const closeOverlay = useCallback(() => {
     setSelection(null);
@@ -534,22 +569,11 @@ export default function MyLibrary({ books }: { books: Book[] }) {
         flowerEditable={role === "owner"}
         mobile={mobile}
         target={target}
-        onTarget={(nextTarget) => setTarget((current) => {
-          if (current?.kind === "book" && nextTarget?.kind === "book"
-            && sameSelection(current.selection, nextTarget.selection)) return current;
-          if (current?.kind === "flower-trough" && nextTarget?.kind === "flower-trough"
-            && current.side === nextTarget.side) return current;
-          if (current?.kind === nextTarget?.kind
-            && current?.kind !== "book"
-            && current?.kind !== "flower-trough") return current;
-          return nextTarget;
-        })}
+        onTarget={handleTarget}
         onActivateTarget={openTarget}
         onControlsReady={setControls}
-        onLock={() => changeMode("moving")}
-        onUnlock={() => {
-          if (modeRef.current === "moving") changeMode("pause");
-        }}
+        onLock={handleRoomLock}
+        onUnlock={handleRoomUnlock}
       /> : <div className="webgl-fallback"><h1>My Library</h1><p>Your browser cannot display the 3D room.</p></div>}
 
       <header className="room-header">

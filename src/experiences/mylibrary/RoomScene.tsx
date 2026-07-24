@@ -2,7 +2,7 @@
 
 import { PointerLockControls } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
-import { useCallback, useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { PointerLockControls as PointerLockControlsImpl } from "three-stdlib";
 import type { RoomControlsHandle } from "@/types/library";
@@ -24,6 +24,7 @@ import {
 import type { MyLibraryTarget } from "@/experiences/mylibrary/types";
 import type { PhotoOption } from "@/experiences/mylibrary/photoOptions";
 import CuratedBooks from "@/experiences/mylibrary/CuratedBooks";
+import { StaticShadowMap } from "@/components/scene-assets/StaticShadowMap";
 
 const CAMERA_HEIGHT = 3.53;
 const MOBILE_MIN_PITCH = -0.72;
@@ -44,7 +45,7 @@ function CameraRig({
   onLock: () => void;
   onUnlock: () => void;
 }) {
-  const { camera, gl } = useThree();
+  const { camera, gl, invalidate } = useThree();
   const drag = useRef({ active: false, moved: false, x: 0, y: 0 });
   const controlsRef = useRef<PointerLockControlsImpl | null>(null);
 
@@ -52,7 +53,8 @@ function CameraRig({
     camera.position.set(0, CAMERA_HEIGHT, 0.7);
     camera.rotation.order = "YXZ";
     camera.lookAt(0, CAMERA_HEIGHT, -5);
-  }, [camera]);
+    invalidate();
+  }, [camera, invalidate]);
 
   useEffect(() => {
     if (mobile) return;
@@ -82,6 +84,7 @@ function CameraRig({
         MOBILE_MIN_PITCH,
         MOBILE_MAX_PITCH,
       );
+      invalidate();
       drag.current.x = event.clientX;
       drag.current.y = event.clientY;
     };
@@ -97,7 +100,7 @@ function CameraRig({
       element.removeEventListener("pointermove", move);
       element.removeEventListener("pointerup", up);
     };
-  }, [camera, gl.domElement, mobile, onActivateTarget, target]);
+  }, [camera, gl.domElement, invalidate, mobile, onActivateTarget, target]);
 
   return mobile ? null : <PointerLockControls
     ref={controlsRef}
@@ -109,7 +112,23 @@ function CameraRig({
 }
 
 function Scene(props: MyLibraryRoomSceneProps) {
+  const shadowRevision = useMemo(
+    () => ({
+      completedBooks: props.completedBooks,
+      currentlyReadingBook: props.currentlyReadingBook,
+      flowerVariant: props.flowerVariant,
+      readingListBooks: props.readingListBooks,
+    }),
+    [
+      props.completedBooks,
+      props.currentlyReadingBook,
+      props.flowerVariant,
+      props.readingListBooks,
+    ],
+  );
+
   return <>
+    <StaticShadowMap enabled={!props.mobile} revision={shadowRevision} />
     <RoomEnvironment />
     <VintageGate position={[0, 0, ROOM_HALF - 0.33]} />
     <Bookcase wall="rear" />
@@ -161,16 +180,19 @@ interface MyLibraryRoomSceneProps {
   onUnlock: () => void;
 }
 
-export default function RoomScene(props: MyLibraryRoomSceneProps) {
+function RoomScene(props: MyLibraryRoomSceneProps) {
   const handleCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
     gl.setClearColor(ROOM_WALL_COLOR);
     gl.shadowMap.enabled = !props.mobile;
     gl.shadowMap.type = THREE.PCFSoftShadowMap;
+    gl.shadowMap.autoUpdate = false;
+    gl.shadowMap.needsUpdate = !props.mobile;
   }, [props.mobile]);
 
   return <Canvas
     camera={{ position: [0, CAMERA_HEIGHT, 0.7], fov: 68, near: 0.1, far: 40 }}
     dpr={props.mobile ? [1, 1.25] : [1, 1.7]}
+    frameloop="demand"
     shadows={!props.mobile}
     onCreated={handleCreated}
     gl={{ antialias: true, powerPreference: "high-performance" }}
@@ -178,3 +200,5 @@ export default function RoomScene(props: MyLibraryRoomSceneProps) {
     <Scene {...props} />
   </Canvas>;
 }
+
+export default memo(RoomScene);

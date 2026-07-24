@@ -1,6 +1,7 @@
 "use client";
 
 import { useTexture } from "@react-three/drei";
+import { useThree } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo } from "react";
 import type { RefObject } from "react";
 import * as THREE from "three";
@@ -14,10 +15,12 @@ const APERTURE_HEIGHT = 0.4;
 
 function FramedPhoto({ photo }: { photo: PhotoOption }) {
   const texture = useTexture(photo.textureSrc);
+  const invalidate = useThree((state) => state.invalidate);
   useEffect(() => {
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.needsUpdate = true;
-  }, [texture]);
+    invalidate();
+  }, [invalidate, texture]);
 
   const dimensions = useMemo<[number, number]>(() => {
     const apertureRatio = APERTURE_WIDTH / APERTURE_HEIGHT;

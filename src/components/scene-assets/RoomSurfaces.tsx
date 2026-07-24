@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
+import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
 type Point = [number, number, number];
@@ -181,6 +182,7 @@ function createRoofTileTransforms(faces: RoofFacePoints[]) {
 function RoofTiles({ faces }: { faces: RoofFacePoints[] }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const transforms = useMemo(() => createRoofTileTransforms(faces), [faces]);
+  const invalidate = useThree((state) => state.invalidate);
 
   useEffect(() => {
     const mesh = meshRef.current;
@@ -198,7 +200,8 @@ function RoofTiles({ faces }: { faces: RoofFacePoints[] }) {
     const material = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     material.forEach((item) => { item.needsUpdate = true; });
     mesh.computeBoundingSphere();
-  }, [transforms]);
+    invalidate();
+  }, [invalidate, transforms]);
 
   return <instancedMesh ref={meshRef} args={[undefined, undefined, transforms.length]} receiveShadow>
     <boxGeometry />

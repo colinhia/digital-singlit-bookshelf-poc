@@ -52,18 +52,29 @@ import type {
 } from "@/experiences/mylibrary/types";
 
 const COMPLETED_SLOTS_PER_TIER = 25;
+const CENTER_POINTER = new THREE.Vector2(0, 0);
 
-interface CuratedShelfItem {
+interface ProfiledShelfItem {
   book: Book;
   location: Exclude<MyLibraryLocation, "currently-reading">;
   slotIndex: number;
   profile: BookRenderProfile;
 }
 
+interface CuratedShelfItem extends ProfiledShelfItem {
+  baseTransform: THREE.Matrix4;
+  spineMatrix: THREE.Matrix4;
+  pageMatrix: THREE.Matrix4;
+  leftBoardMatrix: THREE.Matrix4;
+  rightBoardMatrix: THREE.Matrix4;
+  coverColor: THREE.Color;
+  pageColor: THREE.Color;
+}
+
 function makeShelfItems(
   readingListBooks: Book[],
   completedBooks: Book[],
-): CuratedShelfItem[] {
+): ProfiledShelfItem[] {
   return [
     ...readingListBooks.map((book, slotIndex) => ({
       book,
@@ -80,7 +91,7 @@ function makeShelfItems(
   ];
 }
 
-function baseMatrix(item: CuratedShelfItem) {
+function baseMatrix(item: ProfiledShelfItem) {
   const isReadingList = item.location === "reading-list";
   const slotsPerTier = isReadingList ? READING_LIST_SLOTS_PER_TIER : COMPLETED_SLOTS_PER_TIER;
   const shelfWidth = isReadingList ? READING_LIST_SHELF_WIDTH : SHELF_WIDTH;
@@ -101,13 +112,30 @@ function baseMatrix(item: CuratedShelfItem) {
 }
 
 function layerMatrix(
-  item: CuratedShelfItem,
+  baseTransform: THREE.Matrix4,
   dimensions: [number, number, number],
   offset: [number, number, number] = [0, 0, 0],
 ) {
-  return baseMatrix(item)
+  return baseTransform.clone()
     .multiply(new THREE.Matrix4().makeTranslation(offset[0], offset[1] + dimensions[1] / 2, offset[2]))
     .multiply(new THREE.Matrix4().makeScale(...dimensions));
+}
+
+function createRenderedShelfItems(items: ProfiledShelfItem[]): CuratedShelfItem[] {
+  return items.map((item) => {
+    const baseTransform = baseMatrix(item);
+    const layers = resolveBookLayerGeometry(item.profile);
+    return {
+      ...item,
+      baseTransform,
+      spineMatrix: layerMatrix(baseTransform, layers.spineDimensions, layers.spineOffset),
+      pageMatrix: layerMatrix(baseTransform, layers.pageDimensions, layers.pageOffset),
+      leftBoardMatrix: layerMatrix(baseTransform, layers.boardDimensions, [-layers.boardX, 0, 0]),
+      rightBoardMatrix: layerMatrix(baseTransform, layers.boardDimensions, [layers.boardX, 0, 0]),
+      coverColor: new THREE.Color(getBookAppearanceColor(resolveBookAppearance(item.book))),
+      pageColor: new THREE.Color(getBookPageColor(item.book)),
+    };
+  });
 }
 
 function BookTitleBatch({
@@ -173,7 +201,7 @@ function BookTitleBatch({
     const indices: number[] = [];
     const vertex = new THREE.Vector3();
     items.forEach((item, index) => {
-      const transform = baseMatrix(item);
+      const transform = item.baseTransform;
       const firstVertex = positions.length / 3;
       const halfWidth = item.profile.width * 0.44;
       const front = item.profile.depth / 2 + 0.006;
@@ -268,10 +296,11 @@ export default function CuratedBooks({
   onTarget: (target: MyLibraryTarget | null) => void;
   onActivateTarget: (target: MyLibraryTarget) => void;
 }) {
-  const items = useMemo(
+  const profiledItems = useMemo(
     () => makeShelfItems(readingListBooks, completedBooks),
     [completedBooks, readingListBooks],
   );
+  const items = useMemo(() => createRenderedShelfItems(profiledItems), [profiledItems]);
   const spineRef = useRef<THREE.InstancedMesh>(null);
   const pagesRef = useRef<THREE.InstancedMesh>(null);
   const boardsRef = useRef<THREE.InstancedMesh>(null);
@@ -281,13 +310,16 @@ export default function CuratedBooks({
   const flowerTroughRefs = useRef<Array<THREE.Group | null>>([]);
   const targetRef = useRef<MyLibraryTarget | null>(null);
   const targetIndexRef = useRef<number | null>(null);
-  const { camera } = useThree();
+  const { camera, invalidate } = useThree();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const raycastTargetsRef = useRef<THREE.Object3D[]>([]);
+  const intersectionsRef = useRef<THREE.Intersection[]>([]);
+  const coverColorRef = useRef(new THREE.Color());
   const geometries = useBookGeometries();
   const instanceCapacity = Math.max(1, items.length);
 
   const setCoverColor = (index: number, value: string) => {
-    const color = new THREE.Color(value);
+    const color = coverColorRef.current.set(value);
     spineRef.current?.setColorAt(index, color);
     boardsRef.current?.setColorAt(index * 2, color);
     boardsRef.current?.setColorAt(index * 2 + 1, color);
@@ -298,20 +330,15 @@ export default function CuratedBooks({
     const pages = pagesRef.current;
     const boards = boardsRef.current;
     if (!spine || !pages || !boards) return;
-    const coverColor = new THREE.Color();
-    const pageColor = new THREE.Color();
     items.forEach((item, index) => {
-      const layers = resolveBookLayerGeometry(item.profile);
-      spine.setMatrixAt(index, layerMatrix(item, layers.spineDimensions, layers.spineOffset));
-      pages.setMatrixAt(index, layerMatrix(item, layers.pageDimensions, layers.pageOffset));
-      boards.setMatrixAt(index * 2, layerMatrix(item, layers.boardDimensions, [-layers.boardX, 0, 0]));
-      boards.setMatrixAt(index * 2 + 1, layerMatrix(item, layers.boardDimensions, [layers.boardX, 0, 0]));
-      coverColor.set(getBookAppearanceColor(resolveBookAppearance(item.book)));
-      pageColor.set(getBookPageColor(item.book));
-      spine.setColorAt(index, coverColor);
-      pages.setColorAt(index, pageColor);
-      boards.setColorAt(index * 2, coverColor);
-      boards.setColorAt(index * 2 + 1, coverColor);
+      spine.setMatrixAt(index, item.spineMatrix);
+      pages.setMatrixAt(index, item.pageMatrix);
+      boards.setMatrixAt(index * 2, item.leftBoardMatrix);
+      boards.setMatrixAt(index * 2 + 1, item.rightBoardMatrix);
+      spine.setColorAt(index, item.coverColor);
+      pages.setColorAt(index, item.pageColor);
+      boards.setColorAt(index * 2, item.coverColor);
+      boards.setColorAt(index * 2 + 1, item.coverColor);
     });
     spine.count = pages.count = items.length;
     boards.count = items.length * 2;
@@ -320,7 +347,8 @@ export default function CuratedBooks({
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       mesh.computeBoundingSphere();
     });
-  }, [items]);
+    invalidate();
+  }, [invalidate, items]);
 
   useEffect(() => {
     const current = targetRef.current;
@@ -351,12 +379,18 @@ export default function CuratedBooks({
     const spine = spineRef.current;
     const shelfTarget = readingShelfRef.current;
     if (!spine || !shelfTarget) return;
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-    const targets: THREE.Object3D[] = [spine, shelfTarget];
+    raycaster.setFromCamera(CENTER_POINTER, camera);
+    const targets = raycastTargetsRef.current;
+    targets.length = 0;
+    targets.push(spine, shelfTarget);
     if (tableRef.current) targets.push(tableRef.current);
     if (frameEditable && pictureFrameRef.current) targets.push(pictureFrameRef.current);
     if (flowerEditable) flowerTroughRefs.current.forEach((trough) => trough && targets.push(trough));
-    const hit = raycaster.intersectObjects(targets, true)[0];
+    const intersections = intersectionsRef.current;
+    intersections.length = 0;
+    raycaster.intersectObjects(targets, true, intersections);
+    const hit = intersections[0];
+    intersections.length = 0;
     let nextIndex: number | null = null;
     let next: MyLibraryTarget | null = null;
     if (hit?.object === spine && hit.instanceId !== undefined) {

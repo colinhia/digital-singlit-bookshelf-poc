@@ -48,7 +48,9 @@ export function spineTitle(title: string) {
 }
 
 function resolveSpineFontFamilies() {
-  const styles = getComputedStyle(document.documentElement);
+  const scope = document.querySelector<HTMLElement>("[data-spine-font-scope]")
+    ?? document.documentElement;
+  const styles = getComputedStyle(scope);
   return Object.fromEntries(Object.entries(FONT_VARIABLES).map(([language, variable]) => {
     const family = styles.getPropertyValue(variable).trim();
     return [language, family ? `${family}, ${FALLBACK_FONT_FAMILY}` : FALLBACK_FONT_FAMILY];

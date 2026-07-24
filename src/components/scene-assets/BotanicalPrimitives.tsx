@@ -1,9 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
+import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
 export type Point = [number, number, number];
+
+export interface StemSegmentSpec {
+  from: Point;
+  to: Point;
+}
 
 export interface PartTransform {
   position: THREE.Vector3;
@@ -14,6 +20,7 @@ export interface PartTransform {
 
 export function InstancedFlatParts({ transforms }: { transforms: PartTransform[] }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
+  const invalidate = useThree((state) => state.invalidate);
 
   useEffect(() => {
     const mesh = meshRef.current;
@@ -28,7 +35,8 @@ export function InstancedFlatParts({ transforms }: { transforms: PartTransform[]
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [transforms]);
+    invalidate();
+  }, [invalidate, transforms]);
 
   return <instancedMesh ref={meshRef} args={[undefined, undefined, transforms.length]} castShadow>
     <circleGeometry args={[1, 7]} />
@@ -38,6 +46,7 @@ export function InstancedFlatParts({ transforms }: { transforms: PartTransform[]
 
 export function InstancedLeafParts({ transforms }: { transforms: PartTransform[] }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
+  const invalidate = useThree((state) => state.invalidate);
   const leafShape = useMemo(() => {
     const shape = new THREE.Shape();
     shape.moveTo(0, 0);
@@ -59,7 +68,8 @@ export function InstancedLeafParts({ transforms }: { transforms: PartTransform[]
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [transforms]);
+    invalidate();
+  }, [invalidate, transforms]);
 
   return <instancedMesh ref={meshRef} args={[undefined, undefined, transforms.length]} castShadow>
     <shapeGeometry args={[leafShape, 5]} />
@@ -69,6 +79,7 @@ export function InstancedLeafParts({ transforms }: { transforms: PartTransform[]
 
 export function InstancedRoundParts({ transforms }: { transforms: PartTransform[] }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
+  const invalidate = useThree((state) => state.invalidate);
 
   useEffect(() => {
     const mesh = meshRef.current;
@@ -83,7 +94,8 @@ export function InstancedRoundParts({ transforms }: { transforms: PartTransform[
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [transforms]);
+    invalidate();
+  }, [invalidate, transforms]);
 
   return <instancedMesh ref={meshRef} args={[undefined, undefined, transforms.length]} castShadow>
     <sphereGeometry args={[1, 7, 5]} />
@@ -91,25 +103,52 @@ export function InstancedRoundParts({ transforms }: { transforms: PartTransform[
   </instancedMesh>;
 }
 
-export function StemSegment({ from, to, radius = 0.018, color = "#38523a" }: {
-  from: Point;
-  to: Point;
+export function InstancedStemSegments({
+  segments,
+  radius = 0.018,
+  color = "#38523a",
+}: {
+  segments: readonly StemSegmentSpec[];
   radius?: number;
   color?: string;
 }) {
-  const transform = useMemo(() => {
-    const start = new THREE.Vector3(...from);
-    const end = new THREE.Vector3(...to);
-    const direction = end.clone().sub(start);
-    return {
-      position: start.clone().add(end).multiplyScalar(0.5),
-      length: direction.length(),
-      quaternion: new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize()),
-    };
-  }, [from, to]);
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const { gl, invalidate } = useThree();
 
-  return <mesh position={transform.position} quaternion={transform.quaternion} castShadow>
-    <cylinderGeometry args={[radius, radius * 0.82, transform.length, 6]} />
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const matrix = new THREE.Matrix4();
+    const start = new THREE.Vector3();
+    const end = new THREE.Vector3();
+    const direction = new THREE.Vector3();
+    const position = new THREE.Vector3();
+    const scale = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0);
+    segments.forEach((segment, index) => {
+      start.set(...segment.from);
+      end.set(...segment.to);
+      direction.subVectors(end, start);
+      const length = direction.length();
+      position.addVectors(start, end).multiplyScalar(0.5);
+      quaternion.setFromUnitVectors(up, direction.normalize());
+      matrix.compose(position, quaternion, scale.set(radius, length, radius));
+      mesh.setMatrixAt(index, matrix);
+    });
+    mesh.count = segments.length;
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
+    if (gl.shadowMap.enabled) gl.shadowMap.needsUpdate = true;
+    invalidate();
+  }, [gl, invalidate, radius, segments]);
+
+  return <instancedMesh
+    ref={meshRef}
+    args={[undefined, undefined, Math.max(1, segments.length)]}
+    castShadow
+  >
+    <cylinderGeometry args={[1, 0.82, 1, 6]} />
     <meshStandardMaterial color={color} roughness={0.98} />
-  </mesh>;
+  </instancedMesh>;
 }

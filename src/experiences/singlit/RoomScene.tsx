@@ -2,7 +2,7 @@
 
 import { PointerLockControls } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { PointerLockControls as PointerLockControlsImpl } from "three-stdlib";
 import type { Book, BookSelection, RoomControlsHandle } from "@/types/library";
@@ -13,6 +13,7 @@ import BookCollection from "@/experiences/singlit/BookCollection";
 import RoomCentrepiece from "@/components/scene-assets/RoomCentrepiece";
 import { EntranceFoliage, PerimeterFoliage } from "@/components/scene-assets/EntranceFoliage";
 import { VintageGate } from "@/components/scene-assets/VintageGate";
+import { StaticShadowMap } from "@/components/scene-assets/StaticShadowMap";
 import {
   BOOKCASE_FACE,
   BOOKCASE_WIDTH,
@@ -28,14 +29,15 @@ const MOBILE_MAX_PITCH = 1.05;
 const SLOTS_PER_TIER = roomLayout.walls[0].slotsPerTier;
 
 function CameraRig({ mobile, onSelect, target, onControlsReady, onLock, onUnlock }: { mobile: boolean; onSelect: (selection: BookSelection) => void; target: BookSelection | null; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
-  const { camera, gl } = useThree();
+  const { camera, gl, invalidate } = useThree();
   const drag = useRef({ active:false, moved:false, x:0, y:0 });
   const controlsRef = useRef<PointerLockControlsImpl | null>(null);
   useEffect(() => {
     camera.position.set(0, CAMERA_HEIGHT, 0.7);
     camera.rotation.order = "YXZ";
     camera.lookAt(0, CAMERA_HEIGHT, -5);
-  }, [camera]);
+    invalidate();
+  }, [camera, invalidate]);
   useEffect(() => {
     if (mobile) return;
     const handle: RoomControlsHandle = {
@@ -61,17 +63,24 @@ function CameraRig({ mobile, onSelect, target, onControlsReady, onLock, onUnlock
         MOBILE_MIN_PITCH,
         MOBILE_MAX_PITCH,
       );
+      invalidate();
       drag.current.x = event.clientX; drag.current.y = event.clientY;
     };
     const up = () => { if (!drag.current.moved && target) onSelect(target); drag.current.active = false; };
     element.addEventListener("pointerdown", down); element.addEventListener("pointermove", move); element.addEventListener("pointerup", up);
     return () => { element.removeEventListener("pointerdown", down); element.removeEventListener("pointermove", move); element.removeEventListener("pointerup", up); };
-  }, [camera, gl.domElement, mobile, onSelect, target]);
+  }, [camera, gl.domElement, invalidate, mobile, onSelect, target]);
   return mobile ? null : <PointerLockControls ref={controlsRef} makeDefault selector="#no-automatic-pointer-lock" onLock={onLock} onUnlock={onUnlock} />;
 }
 
 function Scene({ books, tableBooks, matchingSerials, mobile, onSelect, onTarget, target, onControlsReady, onLock, onUnlock }: { books: Book[]; tableBooks: Book[]; matchingSerials: Set<number>; mobile: boolean; onSelect: (selection: BookSelection) => void; onTarget: (selection: BookSelection | null) => void; target: BookSelection | null; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
+  const shadowRevision = useMemo(
+    () => ({ matchingSerials, tableBooks }),
+    [matchingSerials, tableBooks],
+  );
+
   return <>
+    <StaticShadowMap enabled={!mobile} revision={shadowRevision} />
     <RoomEnvironment />
     <VintageGate position={[0, 0, ROOM_HALF - 0.33]} />
     <EntranceFoliage position={[0, 0, ROOM_HALF - 0.62]} />
@@ -95,13 +104,17 @@ function Scene({ books, tableBooks, matchingSerials, mobile, onSelect, onTarget,
   </>;
 }
 
-export default function RoomScene({ books, tableBooks, matchingSerials, onSelect, onTarget, target, mobile, onControlsReady, onLock, onUnlock }: { books: Book[]; tableBooks: Book[]; matchingSerials: Set<number>; onSelect: (selection: BookSelection) => void; onTarget: (selection: BookSelection | null) => void; target: BookSelection | null; mobile: boolean; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
+function RoomScene({ books, tableBooks, matchingSerials, onSelect, onTarget, target, mobile, onControlsReady, onLock, onUnlock }: { books: Book[]; tableBooks: Book[]; matchingSerials: Set<number>; onSelect: (selection: BookSelection) => void; onTarget: (selection: BookSelection | null) => void; target: BookSelection | null; mobile: boolean; onControlsReady: (controls: RoomControlsHandle | null) => void; onLock: () => void; onUnlock: () => void }) {
   const handleCreated = useCallback(({ gl }: { gl: THREE.WebGLRenderer }) => {
     gl.setClearColor(ROOM_WALL_COLOR);
     gl.shadowMap.enabled = !mobile;
     gl.shadowMap.type = THREE.PCFSoftShadowMap;
+    gl.shadowMap.autoUpdate = false;
+    gl.shadowMap.needsUpdate = !mobile;
   }, [mobile]);
-  return <Canvas camera={{ position:[0,CAMERA_HEIGHT,0.7], fov:68, near:0.1, far:40 }} dpr={mobile ? [1,1.25] : [1,1.7]} shadows={!mobile} onCreated={handleCreated} gl={{ antialias:true, powerPreference:"high-performance" }}>
+  return <Canvas camera={{ position:[0,CAMERA_HEIGHT,0.7], fov:68, near:0.1, far:40 }} dpr={mobile ? [1,1.25] : [1,1.7]} frameloop="demand" shadows={!mobile} onCreated={handleCreated} gl={{ antialias:true, powerPreference:"high-performance" }}>
     <Scene books={books} tableBooks={tableBooks} matchingSerials={matchingSerials} mobile={mobile} onSelect={onSelect} onTarget={onTarget} target={target} onControlsReady={onControlsReady} onLock={onLock} onUnlock={onUnlock} />
   </Canvas>;
 }
+
+export default memo(RoomScene);
