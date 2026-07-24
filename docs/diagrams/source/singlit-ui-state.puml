@@ -1,0 +1,41 @@
+@startuml
+' Evidence: src/experiences/singlit/Library.tsx (RoomMode, RoomAction and roomReducer)
+' Evidence: src/experiences/singlit/Library.tsx (requestMoving, openBook, openBorrow, keyboard effect)
+!include _theme.iuml
+
+title SingLit UI state machine
+
+state filters
+state resume
+state moving
+state info
+state borrow
+
+[*] --> filters
+
+filters --> filters : REQUEST_LOCK: remember filters\nLOCK_FAILED: clear pending
+resume --> resume : REQUEST_LOCK: remember resume\nLOCK_FAILED: clear pending
+info --> info : REQUEST_LOCK: remember info\nLOCK_FAILED: clear pending
+
+filters --> moving : LOCK_ACQUIRED\n[pending from filters]
+resume --> moving : LOCK_ACQUIRED\n[pending from resume]
+info --> moving : LOCK_ACQUIRED\n[pending from info]
+
+moving --> filters : UNLOCKED
+moving --> info : OPEN_INFO\n[book selected]
+info --> info : NAVIGATE_INFO\n[same location]
+info --> borrow : OPEN_BORROW\n[table selection and stack not empty]
+borrow --> resume : CLOSE_BORROW
+filters --> resume : SHOW_RESUME / Escape
+info --> resume : SHOW_RESUME / Escape
+
+note right of moving
+  Mobile treats entry as immediate lock acquisition.
+  Desktop waits for PointerLockControls.onLock.
+end note
+
+note bottom of info
+  Desktop unlock after opening details does not
+  leave info: UNLOCKED only changes moving.
+end note
+@enduml

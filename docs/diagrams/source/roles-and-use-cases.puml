@@ -1,0 +1,55 @@
+@startuml
+' Evidence: src/app/page.tsx (Home)
+' Evidence: src/experiences/singlit/Library.tsx (Library)
+' Evidence: src/experiences/mylibrary/MyLibrary.tsx (chooseRole, openTarget and mutation handlers)
+' Evidence: src/experiences/mylibrary/types.ts (MyLibraryRole)
+!include _theme.iuml
+
+title Current roles and use cases
+left to right direction
+
+actor "Collection\nExplorer" as Explorer
+actor "My Library\nOwner" as Owner
+actor "My Library\nVisitor" as Visitor
+
+rectangle "Digital SingLit Bookshelf PoC" {
+  usecase "Filter the shared\ncatalogue" as Filter
+  usecase "Look around the\nSingLit room" as Explore
+  usecase "Inspect book details" as Inspect
+  usecase "Move books between\nshelf and table" as Table
+  usecase "Display the NLB\nmobile-app QR" as QR
+
+  usecase "Choose a visit-scoped\nrole" as ChooseRole
+  usecase "Browse a personal\nlibrary" as BrowsePersonal
+  usecase "Build a reading list" as BuildList
+  usecase "Move a book through\nreading states" as MoveState
+  usecase "Add or edit a review" as Review
+  usecase "Choose the framed\nphoto and flowers" as Personalize
+  usecase "Read example reviews" as ReadReview
+}
+
+Explorer --> Filter
+Explorer --> Explore
+Explorer --> Inspect
+Explorer --> Table
+Explorer --> QR
+
+Owner --> ChooseRole
+Owner --> BrowsePersonal
+Owner --> Inspect
+Owner --> BuildList
+Owner --> MoveState
+Owner --> Review
+Owner --> Personalize
+
+Visitor --> ChooseRole
+Visitor --> BrowsePersonal
+Visitor --> Inspect
+Visitor --> ReadReview
+
+note bottom
+  Owner and Visitor are local interaction modes.
+  The current application has no login, account,
+  authentication, or authorization service.
+end note
+@enduml

@@ -1,0 +1,59 @@
+@startuml
+' Evidence: database/001_create_books.sql
+' Evidence: src/data/books.ts (BookRow and getBooks)
+' Evidence: src/types/library.ts (Book and Language)
+!include _theme.iuml
+
+title Current persisted schema and application mapping
+left to right direction
+skinparam linetype ortho
+
+entity "books" as BooksTable {
+  * serial_number : INTEGER <<PK, CHECK > 0>>
+  --
+  * language : TEXT <<INDEX>>
+  * barcode : TEXT <<UNIQUE>>
+  * title : TEXT <<INDEX>>
+  * author : TEXT <<INDEX>>
+  * location_code : TEXT
+  * call_number : TEXT
+  * created_at : TIMESTAMPTZ <<DEFAULT NOW()>>
+  * updated_at : TIMESTAMPTZ <<DEFAULT NOW()>>
+}
+
+class "BookRow\n(private adapter shape)" as BookRow {
+  serial_number: number
+  language: Language
+  barcode: string
+  title: string
+  author: string
+  location_code: string
+  call_number: string
+}
+
+class "Book\n(shared application type)" as BookType {
+  serialNumber: number
+  language: Language
+  barcode: string
+  title: string
+  author: string
+  locationCode: string
+  callNumber: string
+}
+
+BooksTable -right-> BookRow
+BookRow -right-> BookType
+
+note bottom of BooksTable
+  One table; no persisted relations.
+  The application issues no writes.
+end note
+
+note bottom of BookRow
+  getBooks selects these seven fields in
+  serial_number order and maps each row to Book.
+  created_at and updated_at are not selected.
+  SQL does not constrain language to the
+  TypeScript union; no runtime validation occurs.
+end note
+@enduml

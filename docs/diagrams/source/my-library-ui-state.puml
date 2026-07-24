@@ -1,0 +1,55 @@
+@startuml
+' Evidence: src/experiences/mylibrary/types.ts (MyLibraryMode)
+' Evidence: src/experiences/mylibrary/MyLibrary.tsx (changeMode, chooseRole, enterRoom, openTarget)
+' Evidence: src/experiences/mylibrary/MyLibrary.tsx (closeOverlay, review handlers and keyboard effect)
+!include _theme.iuml
+
+title My Library UI state machine
+top to bottom direction
+
+state role
+state pause
+state resume
+state moving
+state info
+state review
+
+state "Owner-only overlay modes" as OwnerOverlays {
+  state catalogue
+  state "photo-picker" as PhotoPicker
+  state "flower-picker" as FlowerPicker
+  catalogue -[hidden]down-> PhotoPicker
+  PhotoPicker -[hidden]down-> FlowerPicker
+}
+
+[*] -down-> role
+role -down-> pause : choose Owner / initialize empty visit\nchoose Visitor / initialize fixture
+
+pause -down-> moving : Enter [role chosen]\nmobile direct or desktop onLock
+resume -down-> moving : Resume [role chosen]\nmobile direct or desktop onLock
+moving -left-> pause : pause or desktop onUnlock
+moving -down-> info : activate book target
+moving -right-> catalogue : reading shelf [owner]
+moving -right-> PhotoPicker : picture frame [owner]
+moving -right-> FlowerPicker : flower trough [owner]
+
+OwnerOverlays -up-> resume : close, choose or Escape
+info -left-> resume : close or Escape
+info -down-> review : request completion [owner]\nedit/add completed review [owner]
+review -up-> info : cancel or Escape\nsave review edit
+review -left-> resume : save valid completion\n/ move book and store review
+
+note right of OwnerOverlays
+  Owner guard is enforced in openTarget.
+  A visitor selecting these scene targets
+  performs no action.
+end note
+
+note bottom
+  A document-level pointerlockerror handler changes
+  any current mode, including role, to resume.
+
+  Mode is React state mirrored in modeRef.
+  The callbacks, not a reducer, enforce guards.
+end note
+@enduml

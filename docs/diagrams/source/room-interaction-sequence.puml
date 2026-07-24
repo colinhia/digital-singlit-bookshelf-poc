@@ -1,0 +1,59 @@
+@startuml
+' Evidence: src/experiences/singlit/RoomScene.tsx and src/experiences/mylibrary/RoomScene.tsx (CameraRig)
+' Evidence: src/experiences/singlit/BookCollection.tsx (RealisticBooks)
+' Evidence: src/experiences/mylibrary/CuratedBooks.tsx
+' Evidence: Library.openBook and MyLibrary.openTarget
+!include _theme.iuml
+
+title Current 3D target and activation sequence
+
+actor User
+participant "Experience\ncontroller" as Controller
+participant "CameraRig" as Camera
+participant "React Three Fiber\nrender loop" as Frame
+participant "BookCollection /\nCuratedBooks" as Renderer
+participant "DOM overlay" as Overlay
+
+User -> Controller : Activate Enter / Resume
+
+alt fine pointer
+  Controller -> Camera : controls.lock()
+  Camera --> Controller : onLock
+  Controller -> Controller : mode = moving
+  User -> Camera : move pointer
+  Camera -> Frame : rotate camera + invalidate
+else coarse pointer
+  Controller -> Controller : mode = moving immediately
+  User -> Camera : pointer drag
+  Camera -> Frame : rotate clamped camera + invalidate
+end
+
+loop each demanded frame
+  Frame -> Renderer : useFrame()
+  Renderer -> Renderer : raycast from camera at [0, 0]
+  Renderer -> Renderer : resolve nearest eligible target
+  opt resolved target changed
+    Renderer --> Controller : onTarget(target or null)
+    Controller --> User : update target card
+  end
+end
+
+alt fine-pointer click while pointer lock exists
+  User -> Renderer : window click
+  Renderer --> Controller : activate current target
+else coarse-pointer tap without drag
+  User -> Camera : pointer up
+  Camera --> Controller : activate current target
+end
+
+Controller -> Controller : guard current mode and role
+Controller -> Camera : unlock desktop controls\nwhen opening a target
+Controller -> Controller : set selection / overlay mode
+Controller -> Overlay : render details, catalogue,\nreview or decoration picker
+Overlay --> User : focus first relevant control
+
+note bottom
+  The camera rotates in place. There is no walking,
+  keyboard translation, or touch translation.
+end note
+@enduml

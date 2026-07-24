@@ -1,0 +1,50 @@
+@startuml
+' Evidence: src/experiences/mylibrary/MyLibrary.tsx (addToReadingList, startReading, moveSelectedToCompleted, saveReview, removeSelected)
+' Evidence: src/experiences/mylibrary/MyLibrary.tsx (visitorLibrary and visitorReviews)
+' Evidence: src/experiences/mylibrary/types.ts (CuratedLibraryState and BookReview)
+!include _theme.iuml
+
+title Personal-book lifecycle in the current visit
+
+state "Outside My Library" as Outside
+state "Reading list" as ReadingList
+state "Currently reading" as Current
+state "Completion review\n(not yet committed)" as CompletionReview
+state "Completed with review" as CompletedReviewed
+state "Completed without review\n(visitor fixture only)" as CompletedUnreviewed
+state "Review editor" as ReviewEditor
+state "Removed" as Removed
+
+[*] --> Outside
+Outside --> ReadingList : owner adds from catalogue
+ReadingList --> Current : Start reading
+Current --> ReadingList : owner starts another book\n/ previous current returns to list
+ReadingList --> CompletionReview : Move to completed
+Current --> CompletionReview : Move to completed
+CompletionReview --> ReadingList : cancel [origin was list]
+CompletionReview --> Current : cancel [origin was current]
+CompletionReview --> CompletedReviewed : save valid rating\n/ move and store review
+CompletedReviewed --> ReviewEditor : Edit review
+ReviewEditor --> CompletedReviewed : save or cancel
+ReadingList --> Removed : Remove
+Current --> Removed : Remove
+CompletedReviewed --> Removed : Remove / delete review
+CompletedUnreviewed --> Removed : Remove
+
+state "Visitor fixture creation" as VisitorFixture
+VisitorFixture --> CompletedReviewed : deterministic reviewed entries
+VisitorFixture --> CompletedUnreviewed : every third completed entry
+VisitorFixture --> Current
+VisitorFixture --> ReadingList
+
+note bottom of CompletionReview
+  Rating 1..5 is required.
+  Comment is optional and limited to
+  500 characters by the current UI.
+end note
+
+note bottom
+  These are serial-number memberships in React state,
+  not persisted records or server-side workflow states.
+end note
+@enduml

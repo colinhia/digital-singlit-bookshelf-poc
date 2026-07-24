@@ -1,0 +1,68 @@
+@startuml
+' Evidence: src/app/collection/page.tsx (CollectionPage)
+' Evidence: src/experiences/singlit/Library.tsx (roomReducer, filtering and table handlers)
+' Evidence: src/experiences/singlit/BookCollection.tsx (RealisticBooks)
+' Evidence: src/data/bookPlacement.ts (TABLE_BOOK_CAPACITY and placement helpers)
+!include _theme.iuml
+
+title SingLit Collection activity flow
+
+start
+:Open /collection;
+:Server loads all books from Neon\nordered by serial number;
+:Show filters mode and 3D room;
+
+if (Choose field and enter query?) then (yes)
+  :Filter in browser memory using a\ncase-insensitive substring;
+  :Keep all books visible;\nmute non-matches;
+else (no)
+  :All books match;
+endif
+
+:Activate Enter / Resume;
+if (Coarse pointer?) then (yes)
+  :Enter moving mode immediately;
+  :Drag to rotate camera;
+  :Tap a centred target;
+else (no)
+  :Request pointer lock;
+  if (Lock acquired?) then (yes)
+    :Enter moving mode;
+    :Move pointer to rotate camera;
+    :Click a centred target;
+  else (no)
+    :Remain in originating mode;
+    stop
+  endif
+endif
+
+if (Matching shelf or table book targeted?) then (yes)
+  :Open details and release pointer lock;
+  :Navigate within selected location;
+  if (Book is on shelf?) then (yes)
+    if (Table has fewer than 5 books?) then (yes)
+      :Add serial to table state;
+      :Resume room;
+    else (no)
+      :Add action remains disabled;
+    endif
+  else (table)
+    if (Return selected book?) then (yes)
+      :Remove serial from table state;
+      :Resume room;
+    else (Borrow stack)
+      :Display bundled NLB QR image;
+      :Back enters resume mode;
+    endif
+  endif
+else (no)
+  :Continue looking or pause;
+endif
+
+note right
+  Filters and table serials exist only
+  in the Library React component.
+  Reloading discards them.
+end note
+stop
+@enduml
