@@ -1,64 +1,30 @@
 @startuml
 ' Evidence: src/app/my-library/page.tsx (MyLibraryPage)
 ' Evidence: src/experiences/mylibrary/MyLibrary.tsx (visitorLibrary, chooseRole, openTarget and mutation handlers)
-' Evidence: src/experiences/mylibrary/layout.ts (capacities)
 ' Evidence: src/experiences/mylibrary/photoOptions.ts (photo choices)
 !include _theme.iuml
 
 title My Library activity flow
 
 start
-:Open /my-library;
-:Server loads shared catalogue;
-:Choose visit-scoped role;
+:Open My Library;
+:Choose Owner or Visitor;
 
 if (Owner?) then (yes)
-  :Initialize empty library,\nreviews, frame and troughs;
-  :Enter paused owner room;
-  :Resume and look around;
-  if (Target reading-list shelf?) then (yes)
-    :Open catalogue;
-    :Optionally filter by title,\nauthor, language or call number;
-    :Show results in batches of 50;
-    if (Unique book and list below 32?) then (yes)
-      :Add serial to reading list;
-    else (no)
-      :Disable add action;
-    endif
-  elseif (Target owner decoration?) then (yes)
-    :Choose bundled frame photo\nor matching flower-trough style;
-  else (Target curated book)
-    :Open book details;
-    if (Reading list?) then (yes)
-      :Start reading, or request completion;
-    elseif (Currently reading?) then (yes)
-      :Request completion;
-    else (Completed)
-      :Open review editor or remove book;
-    endif
-    if (Completion requested?) then (yes)
-      :Require rating from 1 to 5;
-      if (Save?) then (yes)
-        :Move serial to completed\nand store review;
-      else (cancel)
-        :Keep prior book location;
-      endif
-    endif
+  :Explore an empty personal room;
+  if (Choose an activity) then (Books)
+    :Browse the catalogue;
+    :Add a book or manage its reading progress;
+    :Write or edit a review;
+  else (Personalize)
+    :Choose the framed photo or flowers;
   endif
 else (Visitor)
-  :Sort catalogue by serial number;
-  :Seed up to 12 completed,\n1 current and 6 reading-list books;
-  :Seed deterministic reviews,\nphoto and orchid troughs;
-  :Enter paused read-only room;
-  :Resume and target a book;
-  :Read details and example review;
-  :Do not expose mutation actions;
+  :Explore the populated example room;
+  :Select a book;
+  :Read its details and example review;
 endif
 
-note right
-  All role, library, review and decoration
-  state exists in the MyLibrary component.
-  Reloading returns to role choice.
-end note
+:Continue exploring or leave;
 stop
 @enduml

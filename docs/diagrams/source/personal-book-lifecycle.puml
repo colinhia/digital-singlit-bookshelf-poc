@@ -1,50 +1,35 @@
 @startuml
 ' Evidence: src/experiences/mylibrary/MyLibrary.tsx (addToReadingList, startReading, moveSelectedToCompleted, saveReview, removeSelected)
-' Evidence: src/experiences/mylibrary/MyLibrary.tsx (visitorLibrary and visitorReviews)
 ' Evidence: src/experiences/mylibrary/types.ts (CuratedLibraryState and BookReview)
 !include _theme.iuml
 
-title Personal-book lifecycle in the current visit
+title How an Owner manages a book
 
-state "Outside My Library" as Outside
+state "Not in My Library" as Outside
 state "Reading list" as ReadingList
 state "Currently reading" as Current
-state "Completion review\n(not yet committed)" as CompletionReview
-state "Completed with review" as CompletedReviewed
-state "Completed without review\n(visitor fixture only)" as CompletedUnreviewed
-state "Review editor" as ReviewEditor
-state "Removed" as Removed
+state "Completed" as Completed
 
 [*] --> Outside
-Outside --> ReadingList : owner adds from catalogue
+Outside --> ReadingList : Add from catalogue
 ReadingList --> Current : Start reading
-Current --> ReadingList : owner starts another book\n/ previous current returns to list
-ReadingList --> CompletionReview : Move to completed
-Current --> CompletionReview : Move to completed
-CompletionReview --> ReadingList : cancel [origin was list]
-CompletionReview --> Current : cancel [origin was current]
-CompletionReview --> CompletedReviewed : save valid rating\n/ move and store review
-CompletedReviewed --> ReviewEditor : Edit review
-ReviewEditor --> CompletedReviewed : save or cancel
-ReadingList --> Removed : Remove
-Current --> Removed : Remove
-CompletedReviewed --> Removed : Remove / delete review
-CompletedUnreviewed --> Removed : Remove
+Current --> ReadingList : Start a different book
+ReadingList --> Completed : Complete and submit review
+Current --> Completed : Complete and submit review
+Completed --> Completed : Edit review
 
-state "Visitor fixture creation" as VisitorFixture
-VisitorFixture --> CompletedReviewed : deterministic reviewed entries
-VisitorFixture --> CompletedUnreviewed : every third completed entry
-VisitorFixture --> Current
-VisitorFixture --> ReadingList
+note right of Completed
+  Completing a book requires a rating.
+  A written comment is optional.
+end note
 
-note bottom of CompletionReview
-  Rating 1..5 is required.
-  Comment is optional and limited to
-  500 characters by the current UI.
+note bottom of Current
+  Starting a different book returns
+  the previous current book to the list.
 end note
 
 note bottom
-  These are serial-number memberships in React state,
-  not persisted records or server-side workflow states.
+  The Owner can remove a book from any of
+  these My Library locations.
 end note
 @enduml

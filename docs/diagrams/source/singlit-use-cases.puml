@@ -1,0 +1,24 @@
+@startuml
+' Evidence: src/experiences/singlit/Library.tsx (filtering, book details, table handlers and borrow view)
+' Evidence: src/data/bookPlacement.ts (TABLE_BOOK_CAPACITY)
+!include _theme.iuml
+
+title What a SingLit Collection visitor can do
+left to right direction
+
+actor "Collection\nExplorer" as Explorer
+
+rectangle "SingLit Collection" {
+  usecase "Search for books" as Search
+  usecase "Look around the room" as Explore
+  usecase "Read book details" as Details
+  usecase "Move books between\nthe shelves and table" as Table
+  usecase "Display the borrowing\nQR screen" as Borrow
+}
+
+Explorer --> Search
+Explorer --> Explore
+Explorer --> Details
+Explorer --> Table
+Explorer --> Borrow
+@enduml

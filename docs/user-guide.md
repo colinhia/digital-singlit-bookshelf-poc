@@ -7,13 +7,9 @@ The application has a static home page with two independent room experiences:
 
 Both rooms use a fixed-position camera. Visitors look around but do not walk through the space. The roles describe visit-scoped interaction modes, not authenticated identities.
 
-![Use-case diagram separating the Collection Explorer from My Library Owner and Visitor capabilities](diagrams/rendered/roles-and-use-cases.svg)
+Owner and Visitor are selected after entering My Library. There is no login, account lookup, authorization service, or server-side role record.
 
-[PlantUML source](diagrams/source/roles-and-use-cases.puml)
-
-The diagram distinguishes the shared-catalogue explorer from the two My Library roles. Owner and Visitor are selected after entering My Library; there is no login, account lookup, authorization service, or server-side role record.
-
-**Implementation anchors:** [`src/app/page.tsx`](../src/app/page.tsx), `Home`; [`src/experiences/singlit/Library.tsx`](../src/experiences/singlit/Library.tsx), `Library`; [`src/experiences/mylibrary/MyLibrary.tsx`](../src/experiences/mylibrary/MyLibrary.tsx), `chooseRole`; [`src/experiences/mylibrary/types.ts`](../src/experiences/mylibrary/types.ts), `MyLibraryRole`.
+**Implementation anchors:** [`src/app/page.tsx`](../src/app/page.tsx), `Home`; [`src/experiences/mylibrary/MyLibrary.tsx`](../src/experiences/mylibrary/MyLibrary.tsx), `chooseRole`; [`src/experiences/mylibrary/types.ts`](../src/experiences/mylibrary/types.ts), `MyLibraryRole`.
 
 ## 1. SingLit Collection
 
@@ -21,13 +17,19 @@ The SingLit Collection at `/collection` displays the shared Neon catalogue acros
 
 Filters, the active selection, and table contents exist only in the `Library` React component. Reloading the route queries the catalogue again and resets the experience.
 
+![Use-case diagram showing what a SingLit Collection Explorer can do](diagrams/rendered/singlit-use-cases.svg)
+
+[PlantUML source](diagrams/source/singlit-use-cases.puml)
+
+The Collection Explorer can search, look around, inspect books, manage the table, and open the borrowing QR screen.
+
 ### Collection workflow
 
 ![Activity diagram for searching, entering, inspecting, and managing table books in the SingLit Collection](diagrams/rendered/singlit-collection-flow.svg)
 
 [PlantUML source](diagrams/source/singlit-collection-flow.puml)
 
-The workflow begins with filtering, then separates desktop pointer-lock and coarse-pointer entry. Selecting a shelf or table book opens its details; the available action depends on the book's current location.
+The workflow follows the visitor's choices from search to room exploration. Selecting a book opens its details, after which it can be added to or returned from the table, or used to open the borrowing screen.
 
 ### Collection controls
 
@@ -84,7 +86,7 @@ My Library at `/my-library` begins with a choice between Owner and Visitor. The 
 
 [PlantUML source](diagrams/source/my-library-flow.puml)
 
-The workflow branches immediately after role selection. Owner actions mutate React memory, while the Visitor branch exposes only book and review browsing.
+The workflow branches immediately after role selection. Owners can manage books and personalize the room; Visitors can explore the populated example and read its book information.
 
 ### Shared My Library controls
 
@@ -111,6 +113,12 @@ Owner mode begins with:
 - no reviews;
 - an empty picture frame;
 - empty flower troughs.
+
+![Use-case diagram showing what a My Library Owner can do](diagrams/rendered/my-library-owner-use-cases.svg)
+
+[PlantUML source](diagrams/source/my-library-owner-use-cases.puml)
+
+The Owner can build the library, manage reading progress and reviews, and personalize the frame and flowers.
 
 #### Build and filter the reading list
 
@@ -153,6 +161,12 @@ Visitor mode is a deterministic, read-only demonstration derived from the curren
 - the 13th becomes the current read when present;
 - books 14 through 19 become the reading list;
 - two of every three completed books receive a deterministic example review.
+
+![Use-case diagram showing what a My Library Visitor can do](diagrams/rendered/my-library-visitor-use-cases.svg)
+
+[PlantUML source](diagrams/source/my-library-visitor-use-cases.puml)
+
+The Visitor can look around, inspect books, and read the example reviews. Editing actions are not available.
 
 The visitor can target books and read their details and existing example reviews. The catalogue shelf, frame, flowers, book state, and reviews cannot be changed in Visitor mode.
 
